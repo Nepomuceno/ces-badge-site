@@ -75,10 +75,11 @@ export function EloProvider({ children }: { children: React.ReactNode }) {
     }
 
     let cancelled = false
+    const activeContestId = contestId
 
-    async function loadVotes() {
+    async function loadVotes(currentContestId: string) {
       try {
-        const query = `contestId=${encodeURIComponent(contestId)}`
+        const query = `contestId=${encodeURIComponent(currentContestId)}`
         const response = await fetch(`/api/votes?${query}`, {
           headers: {
             Accept: 'application/json',
@@ -107,7 +108,7 @@ export function EloProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    void loadVotes()
+    void loadVotes(activeContestId)
 
     return () => {
       cancelled = true
@@ -120,13 +121,14 @@ export function EloProvider({ children }: { children: React.ReactNode }) {
         console.warn('No contest selected; skip recording vote.')
         return
       }
+      const activeContestId = contestId
       try {
-        const response = await fetch(`/api/votes?contestId=${encodeURIComponent(contestId)}`, {
+        const response = await fetch(`/api/votes?contestId=${encodeURIComponent(activeContestId)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ winnerId, loserId, voterHash, contestId }),
+          body: JSON.stringify({ winnerId, loserId, voterHash, contestId: activeContestId }),
         })
 
         if (!response.ok) {

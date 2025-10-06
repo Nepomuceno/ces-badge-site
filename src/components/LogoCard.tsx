@@ -54,7 +54,8 @@ export function LogoCard({
         </div>
         <div className="mt-auto flex flex-wrap gap-3 pt-2 text-sm font-semibold">
           <Link
-            to={`/gallery/${encodeURIComponent(logo.id)}`}
+            to="/gallery/$logoId"
+            params={{ logoId: encodeURIComponent(logo.id) }}
             className="rounded-full border border-white/20 px-4 py-2 text-white transition hover:border-cyan-300 hover:text-cyan-200"
           >
             View details

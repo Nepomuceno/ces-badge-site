@@ -1,5 +1,7 @@
 # CES3 Badge Arena
 
+> ⚠️ Fun project created with AI. There are no plans for ongoing maintenance or official support.
+
 A React 19 + TanStack Router experience purpose-built for exploring, voting on, and managing CES3 badge contenders. Everything runs locally with Bun, Tailwind CSS, and a lightweight roster-backed authentication layer.
 
 ## Quick start (Bun-first)

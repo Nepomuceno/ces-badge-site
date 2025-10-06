@@ -269,7 +269,8 @@ function MyLogosPage() {
                 {latestOwnerAlias && <span>Owner @{latestOwnerAlias}</span>}
               </div>
               <Link
-                to={`/gallery/${encodeURIComponent(latestSubmission.id)}`}
+                to="/gallery/$logoId"
+                params={{ logoId: encodeURIComponent(latestSubmission.id) }}
                 className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/40 hover:text-cyan-50"
               >
                 View in gallery
