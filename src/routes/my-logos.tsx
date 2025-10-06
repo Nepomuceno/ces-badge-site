@@ -102,10 +102,9 @@ function MyLogosPage() {
     setIsSubmitting(true);
 
     try {
-      const imageDataUrl = await readFileAsDataUrl(imageFile);
-
       const form = event.currentTarget;
       const formData = new FormData(form);
+      const imageDataUrl = await readFileAsDataUrl(imageFile);
 
       const name = String(formData.get("name") ?? "").trim();
       const description = String(formData.get("description") ?? "").trim();

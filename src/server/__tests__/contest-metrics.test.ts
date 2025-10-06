@@ -54,7 +54,7 @@ describe('getContestMetrics', () => {
       path.join(dataDir, 'logos.json'),
       `${JSON.stringify(
         {
-          version: 2,
+          version: 3,
           logos: [
             {
               id: 'logo-1',

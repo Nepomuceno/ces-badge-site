@@ -20,6 +20,7 @@ export interface LogoEntry {
   codename: string
   description?: string
   image: string
+  assetPath?: string | null
   ownerAlias: string | null
   source: LogoSource
   submittedBy?: string
@@ -66,6 +67,7 @@ export function createCatalogEntry(logo: LogoVariant, contestId: string = DEFAUL
     codename: generateCodename(logo.name),
     description: logo.description,
     image: logo.image,
+    assetPath: null,
     ownerAlias: normalizeOwnerAlias(logo.ownerAlias),
     source: 'catalog',
     submittedBy: 'ces3@system',

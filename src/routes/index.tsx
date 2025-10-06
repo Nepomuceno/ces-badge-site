@@ -126,12 +126,14 @@ function Home() {
               params={{ logoId: logo.id }}
               className="group overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-lg transition hover:-translate-y-1 hover:border-cyan-200/60"
             >
-              <img
-                src={logo.image}
-                alt={logo.name}
-                className="h-40 w-full object-cover"
-                loading="lazy"
-              />
+              <div className="flex h-40 w-full items-center justify-center bg-slate-950/40">
+                <img
+                  src={logo.image}
+                  alt={logo.name}
+                  className="max-h-full max-w-full object-contain"
+                  loading="lazy"
+                />
+              </div>
               <div className="space-y-2 p-5">
                 <p className="text-xs uppercase tracking-[0.25em] text-white/60">
                   {logo.codename}

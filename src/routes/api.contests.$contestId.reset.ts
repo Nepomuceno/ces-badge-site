@@ -16,9 +16,14 @@ function jsonResponse(body: unknown, init?: ResponseInit) {
 export const Route = createFileRoute('/api/contests/$contestId/reset')({
   server: {
     handlers: {
-      POST: async ({ params }: { params: { contestId: string } }) => {
+  POST: async ({ params }) => {
         try {
-          const contest = await ensureContest(params.contestId)
+          const contestId = (params as Record<string, string>).contestId
+          if (!contestId) {
+            return jsonResponse({ message: 'Contest identifier missing.' }, { status: 400 })
+          }
+
+          const contest = await ensureContest(contestId)
           await resetContestVotes(contest.id)
 
           const metrics = await getContestMetrics(contest.id)

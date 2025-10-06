@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
+import path from 'node:path'
 
 import { logoCatalog } from '../data/logo-catalog'
 import {
@@ -24,8 +25,9 @@ import { ensureDataDir, resolveDataPath } from './storage-utils'
 
 const LOGOS_FILE = 'logos.json'
 const VOTES_FILE = 'votes.json'
-const LOGO_SCHEMA_VERSION = 2
+const LOGO_SCHEMA_VERSION = 3
 const VOTE_SCHEMA_VERSION = 2
+const LOGO_ASSETS_DIR = 'logos'
 
 interface LogosFileSchema {
   version: number
@@ -50,6 +52,90 @@ interface SanitizedSubmitInput {
   image: string
   submittedBy: string
   ownerAlias: string | null
+}
+
+const DATA_URL_REGEX = /^data:(?<mime>[^;]+);base64,(?<data>.+)$/i
+
+const MIME_EXTENSION_MAP: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+}
+
+function inferFileExtension(mimeType: string): string {
+  const lower = mimeType.toLowerCase()
+  if (MIME_EXTENSION_MAP[lower]) {
+    return MIME_EXTENSION_MAP[lower]
+  }
+  if (lower.includes('svg')) {
+    return 'svg'
+  }
+  if (lower.includes('png')) {
+    return 'png'
+  }
+  if (lower.includes('jpeg') || lower.includes('jpg')) {
+    return 'jpg'
+  }
+  if (lower.includes('webp')) {
+    return 'webp'
+  }
+  return 'bin'
+}
+
+function buildLogoAssetFilename(logoId: string, extension: string): string {
+  return `${logoId}.${extension}`
+}
+
+function buildLogoImageUrl(logoId: string, updatedAt: string): string {
+  const timestamp = Date.parse(updatedAt)
+  const version = Number.isNaN(timestamp) ? Date.now() : timestamp
+  return `/api/logos/${encodeURIComponent(logoId)}/image?v=${version}`
+}
+
+function normalizeAssetPath(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+  const normalized = trimmed.replace(/\\/g, '/').replace(/^\//, '')
+  if (normalized.includes('..')) {
+    return null
+  }
+  if (normalized.startsWith(`${LOGO_ASSETS_DIR}/`)) {
+    return normalized
+  }
+  return `${LOGO_ASSETS_DIR}/${path.posix.basename(normalized)}`
+}
+
+async function persistLogoAssetFromDataUrl(logoId: string, dataUrl: string): Promise<{ assetPath: string; mimeType: string }> {
+  const match = DATA_URL_REGEX.exec(dataUrl.trim())
+  if (!match?.groups?.data) {
+    throw new Error('Logo image must be a base64 data URL.')
+  }
+
+  const mimeType = (match.groups.mime ?? 'application/octet-stream').toLowerCase()
+  const base64Payload = match.groups.data.replace(/\s/g, '')
+  const buffer = Buffer.from(base64Payload, 'base64')
+
+  await ensureDataDir()
+  const extension = inferFileExtension(mimeType)
+  const filename = buildLogoAssetFilename(logoId, extension)
+  const relativePath = path.posix.join(LOGO_ASSETS_DIR, filename)
+  const absolutePath = resolveDataPath(relativePath)
+
+  await fs.mkdir(path.dirname(absolutePath), { recursive: true })
+  await fs.writeFile(absolutePath, buffer)
+
+  return {
+    assetPath: relativePath,
+    mimeType,
+  }
 }
 
 function sanitizeIsoString(value: unknown, fallback: string): string {
@@ -89,6 +175,7 @@ function coerceLogoEntry(value: unknown): LogoEntry | null {
       : source === 'catalog'
         ? 'ces3@system'
         : undefined
+  const assetPath = normalizeAssetPath(record.assetPath)
 
   const createdAt = sanitizeIsoString(record.createdAt, BASE_CATALOG_TIMESTAMP)
   const updatedAt = sanitizeIsoString(record.updatedAt, createdAt)
@@ -109,6 +196,7 @@ function coerceLogoEntry(value: unknown): LogoEntry | null {
     codename: codenameField && codenameField.length > 0 ? codenameField : generateCodename(nameField),
     description,
     image,
+  assetPath,
     ownerAlias,
     source,
     submittedBy,
@@ -117,6 +205,56 @@ function coerceLogoEntry(value: unknown): LogoEntry | null {
     removedAt,
     removedBy,
   }
+}
+
+async function normalizeUserLogoEntries(logos: LogoEntry[]): Promise<{ logos: LogoEntry[]; changed: boolean }> {
+  let changed = false
+  const normalized: LogoEntry[] = []
+
+  for (const logo of logos) {
+    if (logo.source !== 'user') {
+      normalized.push(logo)
+      continue
+    }
+
+    let next = { ...logo }
+    let mutated = false
+
+    const sanitizedAssetPath = normalizeAssetPath(next.assetPath)
+    if (sanitizedAssetPath !== (next.assetPath ?? null)) {
+      next.assetPath = sanitizedAssetPath
+      mutated = true
+    }
+
+    if (!next.assetPath && typeof next.image === 'string' && next.image.startsWith('data:')) {
+      try {
+        const { assetPath } = await persistLogoAssetFromDataUrl(next.id, next.image)
+        const updatedAt = new Date().toISOString()
+        next.assetPath = assetPath
+        next.updatedAt = updatedAt
+        next.image = buildLogoImageUrl(next.id, updatedAt)
+        mutated = true
+      } catch (error) {
+        console.warn(`Failed to persist logo asset for ${next.id}`, error)
+      }
+    }
+
+    if (next.assetPath) {
+      const desiredImage = buildLogoImageUrl(next.id, next.updatedAt)
+      if (next.image !== desiredImage) {
+        next.image = desiredImage
+        mutated = true
+      }
+    }
+
+    if (mutated) {
+      changed = true
+    }
+
+    normalized.push(next)
+  }
+
+  return { logos: normalized, changed }
 }
 
 async function readLogosFile(): Promise<LogosFileSchema> {
@@ -131,11 +269,18 @@ async function readLogosFile(): Promise<LogosFileSchema> {
       : []
 
     if (logos.length > 0) {
-      return {
+      const { logos: normalizedLogos, changed } = await normalizeUserLogoEntries(logos)
+      const schema: LogosFileSchema = {
         version: typeof parsed.version === 'number' ? parsed.version : LOGO_SCHEMA_VERSION,
-        logos,
+        logos: normalizedLogos,
         updatedAt: sanitizeIsoString(parsed.updatedAt, new Date().toISOString()),
       }
+
+      if (changed) {
+        await writeLogosFile(schema)
+      }
+
+      return schema
     }
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'code' in error) {
@@ -318,6 +463,9 @@ function sanitizeSubmitInput(input: SubmitLogoInput): SanitizedSubmitInput {
   if (!image) {
     throw new Error('Image is required')
   }
+  if (!DATA_URL_REGEX.test(image)) {
+    throw new Error('Image must be provided as a base64 data URL')
+  }
   if (!submittedBy) {
     throw new Error('Submitter identity is required')
   }
@@ -372,14 +520,17 @@ export async function addLogo(input: SubmitLogoInput): Promise<LogoEntry> {
 
   const logosFile = await readLogosFile()
 
+  const logoId = randomUUID()
+  const { assetPath } = await persistLogoAssetFromDataUrl(logoId, sanitized.image)
   const timestamp = new Date().toISOString()
   const entry: LogoEntry = {
-    id: randomUUID(),
+    id: logoId,
     contestId: resolvedContestId,
     name: sanitized.name,
     codename: generateCodename(sanitized.name),
     description: sanitized.description,
-    image: sanitized.image,
+    image: buildLogoImageUrl(logoId, timestamp),
+    assetPath,
     ownerAlias: sanitized.ownerAlias,
     source: 'user',
     submittedBy: sanitized.submittedBy,
@@ -441,6 +592,10 @@ export async function updateLogoOwner(
     updatedAt: new Date().toISOString(),
   }
 
+  if (updated.assetPath) {
+    updated.image = buildLogoImageUrl(updated.id, updated.updatedAt)
+  }
+
   const nextLogos = sortLogos([
     ...logosFile.logos.slice(0, index),
     updated,
@@ -493,6 +648,10 @@ export async function removeLogo(
     removedAt: timestamp,
     removedBy: removedBy && removedBy.trim().length > 0 ? removedBy.trim() : null,
     updatedAt: timestamp,
+  }
+
+  if (updated.assetPath) {
+    updated.image = buildLogoImageUrl(updated.id, updated.updatedAt)
   }
 
   const nextLogos = sortLogos([

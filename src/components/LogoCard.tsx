@@ -26,12 +26,14 @@ export function LogoCard({
 
   return (
     <article className={wrapperClasses}>
-      <img
-        src={logo.image}
-        alt={logo.name}
-        className="h-48 w-full object-cover"
-        loading="lazy"
-      />
+      <div className="flex h-48 w-full items-center justify-center bg-slate-950/40">
+        <img
+          src={logo.image}
+          alt={logo.name}
+          className="max-h-full max-w-full object-contain"
+          loading="lazy"
+        />
+      </div>
       <div className="flex flex-1 flex-col gap-4 p-6">
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-[0.3em] text-white/50">

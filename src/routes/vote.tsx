@@ -104,11 +104,11 @@ function VotePage() {
               }}
               className="group flex min-w-[18.5rem] snap-center flex-col overflow-hidden rounded-3xl border border-white/15 bg-slate-900/70 text-left shadow-2xl transition hover:border-cyan-300/60 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-400 sm:min-w-0 sm:hover:-translate-y-1"
             >
-              <div className="relative">
+              <div className="relative flex h-48 w-full items-center justify-center bg-slate-950/40 sm:h-64">
                 <img
                   src={logo.image}
                   alt={logo.name}
-                  className="h-48 w-full object-cover sm:h-64"
+                  className="max-h-full max-w-full object-contain"
                   loading="lazy"
                 />
               </div>

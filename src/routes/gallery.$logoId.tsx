@@ -155,12 +155,14 @@ function LogoDetail() {
           </div>
         </div>
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-2xl">
-          <img
-            src={logo.image}
-            alt={logo.name}
-            className="w-full object-cover"
-            loading="lazy"
-          />
+          <div className="flex max-h-[32rem] w-full items-center justify-center bg-slate-950/40 p-6">
+            <img
+              src={logo.image}
+              alt={logo.name}
+              className="max-h-full max-w-full object-contain"
+              loading="lazy"
+            />
+          </div>
         </div>
       </header>
 
