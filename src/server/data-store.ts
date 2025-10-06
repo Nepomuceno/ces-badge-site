@@ -24,6 +24,7 @@ import {
 import { DEFAULT_CONTEST_ID } from '../lib/contest-utils'
 import { ensureContest, getActiveContestId } from './contest-store'
 import { logVoteRecorded, logVotesReset } from './audit-log'
+import { restoreLatestBackup, writeJsonWithBackup } from './persistence-utils'
 import { ensureDataDir, resolveDataPath } from './storage-utils'
 
 const LOGOS_FILE = 'logos.json'
@@ -260,7 +261,8 @@ async function normalizeUserLogoEntries(logos: LogoEntry[]): Promise<{ logos: Lo
   return { logos: normalized, changed }
 }
 
-async function readLogosFile(): Promise<LogosFileSchema> {
+async function readLogosFile(options: { allowRestore?: boolean } = {}): Promise<LogosFileSchema> {
+  const { allowRestore = true } = options
   await ensureDataDir()
   const filePath = resolveDataPath(LOGOS_FILE)
 
@@ -291,8 +293,14 @@ async function readLogosFile(): Promise<LogosFileSchema> {
       if (code !== 'ENOENT') {
         console.warn('Failed to read logos file, regenerating seed.', error)
       }
+      if (allowRestore && (await restoreLatestBackup('logos', filePath))) {
+        return readLogosFile({ allowRestore: false })
+      }
     } else {
       console.warn('Failed to read logos file, regenerating seed.', error)
+      if (allowRestore && (await restoreLatestBackup('logos', filePath))) {
+        return readLogosFile({ allowRestore: false })
+      }
     }
   }
 
@@ -306,7 +314,7 @@ async function readLogosFile(): Promise<LogosFileSchema> {
   return seeded
 }
 
-async function writeLogosFile(schema: LogosFileSchema) {
+async function writeLogosFile(schema: LogosFileSchema, options: { forceBackup?: boolean } = {}) {
   await ensureDataDir()
   const filePath = resolveDataPath(LOGOS_FILE)
   const payload: LogosFileSchema = {
@@ -314,14 +322,22 @@ async function writeLogosFile(schema: LogosFileSchema) {
     logos: sortLogos(schema.logos),
     updatedAt: new Date().toISOString(),
   }
-  await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf-8')
+  await writeJsonWithBackup({
+    filePath,
+    data: payload,
+    prefix: 'logos',
+    minIntervalMs: 5 * 60_000,
+    maxRetained: 24,
+    forceBackup: options.forceBackup ?? false,
+  })
 }
 
 function sanitizeEloState(raw: unknown): EloState {
   return parseEloState(raw)
 }
 
-async function readVotesFile(): Promise<VotesFileSchema> {
+async function readVotesFile(options: { allowRestore?: boolean } = {}): Promise<VotesFileSchema> {
+  const { allowRestore = true } = options
   await ensureDataDir()
   const filePath = resolveDataPath(VOTES_FILE)
 
@@ -368,8 +384,14 @@ async function readVotesFile(): Promise<VotesFileSchema> {
       if (code !== 'ENOENT') {
         console.warn('Failed to read votes file, creating new state.', error)
       }
+      if (allowRestore && (await restoreLatestBackup('votes', filePath))) {
+        return readVotesFile({ allowRestore: false })
+      }
     } else {
       console.warn('Failed to read votes file, creating new state.', error)
+      if (allowRestore && (await restoreLatestBackup('votes', filePath))) {
+        return readVotesFile({ allowRestore: false })
+      }
     }
   }
 
@@ -392,7 +414,7 @@ async function readVotesFile(): Promise<VotesFileSchema> {
   return seeded
 }
 
-async function writeVotesFile(schema: VotesFileSchema) {
+async function writeVotesFile(schema: VotesFileSchema, options: { forceBackup?: boolean } = {}) {
   await ensureDataDir()
   const filePath = resolveDataPath(VOTES_FILE)
   const payload: VotesFileSchema = {
@@ -400,7 +422,14 @@ async function writeVotesFile(schema: VotesFileSchema) {
     contests: schema.contests,
     updatedAt: new Date().toISOString(),
   }
-  await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf-8')
+  await writeJsonWithBackup({
+    filePath,
+    data: payload,
+    prefix: 'votes',
+    minIntervalMs: 15_000,
+    maxRetained: 200,
+    forceBackup: options.forceBackup ?? false,
+  })
 }
 
 function ensureContestVotes(
@@ -885,7 +914,7 @@ export async function resetContestVotes(contestId?: string): Promise<EloState> {
     updatedAt: new Date().toISOString(),
   }
 
-  await writeVotesFile(nextSchema)
+  await writeVotesFile(nextSchema, { forceBackup: true })
 
   try {
     await logVotesReset({

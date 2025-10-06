@@ -115,6 +115,14 @@ bun scripts/import-graph-users.ts \
 - Vote resets (triggered via the admin UI or API) emit a `votes-reset` entry that notes why the reset happened and how many matches existed beforehand.
 - Use `jq` or any log shipper that understands ndjson to stream the file for investigations when votes appear to go missing.
 
+## Vote data backups
+
+- Persistent data writes (`votes.json`, `logos.json`) are performed atomically and flushed to disk before replacing the original file, limiting the chance of partial writes.
+- After every successful write, the final JSON snapshot is copied into `DATA_DIR/backups/<name>/` using a timestamp + UUID filename (for example: `backups/votes/2025-10-06T07-55-12-345Z-a1b2c3.json`). Votes throttle backups to roughly one snapshot every 15 seconds during heavy traffic (resets always force a snapshot) while retaining the latest ~200 entries; logos refreshes are less frequent (~5 minutes, max 24 entries).
+- If the active `votes.json` or `logos.json` ever becomes unreadable (for example, truncated during a crash), the server automatically restores the newest valid backup on the next read.
+- You can manually roll back by copying a snapshot from the backup folder over the live file; the next write will produce a fresh backup entry.
+- Vote resets still preserve prior history—use the backup snapshots to recover the pre-reset standings if the action was accidental.
+
 ## Troubleshooting
 
 - **Alias not found** → Confirm the alias exists in the roster (comparison uses the lowercased value). Update the JSON if the teammate is missing.
