@@ -142,6 +142,7 @@ function AdminContestsPage() {
     createContest,
     updateContest,
     setActiveContest,
+    resetContestVotes,
     refresh,
   } = useContest()
 
@@ -149,7 +150,10 @@ function AdminContestsPage() {
   const [creating, setCreating] = useState(false)
   const [createStatus, setCreateStatus] = useState<MessageState>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [busyContestId, setBusyContestId] = useState<string | null>(null)
+  const [busyContest, setBusyContest] = useState<{
+    id: string
+    action: 'update' | 'activate' | 'reset'
+  } | null>(null)
   const [cardNotices, setCardNotices] = useState<Record<string, MessageState>>({})
 
   const orderedContests = useContestCards(contests)
@@ -456,7 +460,7 @@ function AdminContestsPage() {
                   contest={contest}
                   isActive={contest.id === activeContestId}
                   onUpdate={async (payload) => {
-                    setBusyContestId(contest.id)
+                    setBusyContest({ id: contest.id, action: 'update' })
                     setCardNotices((prev) => ({ ...prev, [contest.id]: null }))
                     try {
                       const updated = await updateContest(contest.id, payload)
@@ -474,11 +478,11 @@ function AdminContestsPage() {
                         [contest.id]: { tone: 'error', text: message },
                       }))
                     } finally {
-                      setBusyContestId(null)
+                      setBusyContest(null)
                     }
                   }}
                   onSetActive={async () => {
-                    setBusyContestId(contest.id)
+                    setBusyContest({ id: contest.id, action: 'activate' })
                     setCardNotices((prev) => ({ ...prev, [contest.id]: null }))
                     try {
                       await setActiveContest(contest.id)
@@ -493,11 +497,31 @@ function AdminContestsPage() {
                         [contest.id]: { tone: 'error', text: message },
                       }))
                     } finally {
-                      setBusyContestId(null)
+                      setBusyContest(null)
+                    }
+                  }}
+                  onResetVotes={async () => {
+                    setBusyContest({ id: contest.id, action: 'reset' })
+                    setCardNotices((prev) => ({ ...prev, [contest.id]: null }))
+                    try {
+                      await resetContestVotes(contest.id)
+                      setCardNotices((prev) => ({
+                        ...prev,
+                        [contest.id]: { tone: 'success', text: 'Contest votes reset.' },
+                      }))
+                    } catch (error) {
+                      const message = error instanceof Error ? error.message : 'Failed to reset votes.'
+                      setCardNotices((prev) => ({
+                        ...prev,
+                        [contest.id]: { tone: 'error', text: message },
+                      }))
+                    } finally {
+                      setBusyContest(null)
                     }
                   }}
                   notice={cardNotices[contest.id] ?? null}
-                  busy={busyContestId === contest.id}
+                  busy={busyContest?.id === contest.id}
+                  busyAction={busyContest?.id === contest.id ? busyContest.action : null}
                 />
               ))}
             </div>
@@ -512,9 +536,11 @@ interface ContestCardProps {
   contest: ContestSummary
   isActive: boolean
   busy: boolean
+  busyAction: 'update' | 'activate' | 'reset' | null
   notice: MessageState
   onUpdate: (payload: Parameters<ReturnType<typeof useContest>['updateContest']>[1]) => Promise<void>
   onSetActive: () => Promise<void>
+  onResetVotes: () => Promise<void>
 }
 
 function computeEndsAtFromDuration(startsAtLocal: string, durationDays: string): string {
@@ -530,7 +556,7 @@ function computeEndsAtFromDuration(startsAtLocal: string, durationDays: string):
   return toDateTimeLocal(startDate.toISOString())
 }
 
-function ContestCard({ contest, isActive, busy, notice, onUpdate, onSetActive }: ContestCardProps) {
+function ContestCard({ contest, isActive, busy, busyAction, notice, onUpdate, onSetActive, onResetVotes }: ContestCardProps) {
   const [form, setForm] = useState<ContestFormState>(() => ({
     title: contest.title,
     slug: contest.slug,
@@ -804,15 +830,31 @@ function ContestCard({ contest, isActive, busy, notice, onUpdate, onSetActive }:
           {!isActive && (
             <button
               type="button"
-              onClick={() => {
-                void onSetActive()
+              onClick={async () => {
+                await onSetActive()
               }}
               className="rounded-full border border-emerald-300/40 px-5 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200 hover:text-emerald-50 disabled:cursor-not-allowed disabled:opacity-70"
               disabled={busy}
             >
-              {busy ? 'Activating…' : 'Set active'}
+              {busyAction === 'activate' ? 'Activating…' : 'Set active'}
             </button>
           )}
+          <button
+            type="button"
+            onClick={async () => {
+              const confirmed = typeof window === 'undefined'
+                ? true
+                : window.confirm('Reset all votes for this contest? This cannot be undone.')
+              if (!confirmed) {
+                return
+              }
+              await onResetVotes()
+            }}
+            className="rounded-full border border-rose-400/40 px-5 py-2 text-sm font-semibold text-rose-100 transition hover:border-rose-200 hover:text-rose-50 disabled:cursor-not-allowed disabled:opacity-70"
+            disabled={busy}
+          >
+            {busyAction === 'reset' ? 'Resetting…' : 'Reset votes'}
+          </button>
         </div>
         <p className="text-xs uppercase tracking-[0.3em] text-white/40">
           Updated {new Date(contest.updatedAt).toLocaleString()}

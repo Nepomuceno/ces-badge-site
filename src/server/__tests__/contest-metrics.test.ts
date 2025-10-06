@@ -7,6 +7,7 @@ const ISO_NOW = '2024-01-01T00:00:00.000Z'
 const LAST_MATCH_TIMESTAMP = 1_700_001_000_000
 
 let getContestMetrics: typeof import('../data-store').getContestMetrics
+let resetContestVotes: typeof import('../data-store').resetContestVotes
 
 describe('getContestMetrics', () => {
   let dataDir: string
@@ -121,7 +122,7 @@ describe('getContestMetrics', () => {
       )}\n`,
       'utf-8',
     )
-    ;({ getContestMetrics } = await import('../data-store'))
+  ;({ getContestMetrics, resetContestVotes } = await import('../data-store'))
   })
 
   afterEach(async () => {
@@ -156,5 +157,24 @@ describe('getContestMetrics', () => {
       logoName: 'Bravo',
       rating: 1400,
     })
+  })
+
+  it('resets votes to a clean state', async () => {
+    const state = await resetContestVotes('test-contest')
+
+    expect(Object.keys(state.entries).sort()).toEqual(['logo-1', 'logo-2'])
+    expect(state.entries['logo-1']).toMatchObject({ rating: 1500, wins: 0, losses: 0, matches: 0 })
+    expect(state.entries['logo-2']).toMatchObject({ rating: 1500, wins: 0, losses: 0, matches: 0 })
+    expect(state.history).toHaveLength(0)
+
+    const metrics = await getContestMetrics('test-contest')
+    expect(metrics.matchCount).toBe(0)
+    expect(metrics.leaderboard).toHaveLength(2)
+    expect(metrics.leaderboard).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ logoId: 'logo-1', rating: 1500, matches: 0 }),
+        expect.objectContaining({ logoId: 'logo-2', rating: 1500, matches: 0 }),
+      ]),
+    )
   })
 })

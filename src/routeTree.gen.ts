@@ -29,6 +29,7 @@ import { Route as DemoStartServerFuncsRouteImport } from './routes/demo.start.se
 import { Route as DemoStartApiRequestRouteImport } from './routes/demo.start.api-request'
 import { Route as ApiLogosLogoIdRouteImport } from './routes/api.logos.$logoId'
 import { Route as ApiContestsContestIdRouteImport } from './routes/api.contests.$contestId'
+import { Route as ApiContestsContestIdResetRouteImport } from './routes/api.contests.$contestId.reset'
 
 const VoteRoute = VoteRouteImport.update({
   id: '/vote',
@@ -130,6 +131,12 @@ const ApiContestsContestIdRoute = ApiContestsContestIdRouteImport.update({
   path: '/$contestId',
   getParentRoute: () => ApiContestsRoute,
 } as any)
+const ApiContestsContestIdResetRoute =
+  ApiContestsContestIdResetRouteImport.update({
+    id: '/reset',
+    path: '/reset',
+    getParentRoute: () => ApiContestsContestIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -148,10 +155,11 @@ export interface FileRoutesByFullPath {
   '/api/logos': typeof ApiLogosRouteWithChildren
   '/api/votes': typeof ApiVotesRoute
   '/gallery/$logoId': typeof GalleryLogoIdRoute
-  '/api/contests/$contestId': typeof ApiContestsContestIdRoute
+  '/api/contests/$contestId': typeof ApiContestsContestIdRouteWithChildren
   '/api/logos/$logoId': typeof ApiLogosLogoIdRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
+  '/api/contests/$contestId/reset': typeof ApiContestsContestIdResetRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -170,10 +178,11 @@ export interface FileRoutesByTo {
   '/api/logos': typeof ApiLogosRouteWithChildren
   '/api/votes': typeof ApiVotesRoute
   '/gallery/$logoId': typeof GalleryLogoIdRoute
-  '/api/contests/$contestId': typeof ApiContestsContestIdRoute
+  '/api/contests/$contestId': typeof ApiContestsContestIdRouteWithChildren
   '/api/logos/$logoId': typeof ApiLogosLogoIdRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
+  '/api/contests/$contestId/reset': typeof ApiContestsContestIdResetRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -193,10 +202,11 @@ export interface FileRoutesById {
   '/api/logos': typeof ApiLogosRouteWithChildren
   '/api/votes': typeof ApiVotesRoute
   '/gallery/$logoId': typeof GalleryLogoIdRoute
-  '/api/contests/$contestId': typeof ApiContestsContestIdRoute
+  '/api/contests/$contestId': typeof ApiContestsContestIdRouteWithChildren
   '/api/logos/$logoId': typeof ApiLogosLogoIdRoute
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
+  '/api/contests/$contestId/reset': typeof ApiContestsContestIdResetRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -221,6 +231,7 @@ export interface FileRouteTypes {
     | '/api/logos/$logoId'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
+    | '/api/contests/$contestId/reset'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -243,6 +254,7 @@ export interface FileRouteTypes {
     | '/api/logos/$logoId'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
+    | '/api/contests/$contestId/reset'
   id:
     | '__root__'
     | '/'
@@ -265,6 +277,7 @@ export interface FileRouteTypes {
     | '/api/logos/$logoId'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
+    | '/api/contests/$contestId/reset'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -429,6 +442,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiContestsContestIdRouteImport
       parentRoute: typeof ApiContestsRoute
     }
+    '/api/contests/$contestId/reset': {
+      id: '/api/contests/$contestId/reset'
+      path: '/reset'
+      fullPath: '/api/contests/$contestId/reset'
+      preLoaderRoute: typeof ApiContestsContestIdResetRouteImport
+      parentRoute: typeof ApiContestsContestIdRoute
+    }
   }
 }
 
@@ -443,12 +463,23 @@ const GalleryRouteChildren: GalleryRouteChildren = {
 const GalleryRouteWithChildren =
   GalleryRoute._addFileChildren(GalleryRouteChildren)
 
+interface ApiContestsContestIdRouteChildren {
+  ApiContestsContestIdResetRoute: typeof ApiContestsContestIdResetRoute
+}
+
+const ApiContestsContestIdRouteChildren: ApiContestsContestIdRouteChildren = {
+  ApiContestsContestIdResetRoute: ApiContestsContestIdResetRoute,
+}
+
+const ApiContestsContestIdRouteWithChildren =
+  ApiContestsContestIdRoute._addFileChildren(ApiContestsContestIdRouteChildren)
+
 interface ApiContestsRouteChildren {
-  ApiContestsContestIdRoute: typeof ApiContestsContestIdRoute
+  ApiContestsContestIdRoute: typeof ApiContestsContestIdRouteWithChildren
 }
 
 const ApiContestsRouteChildren: ApiContestsRouteChildren = {
-  ApiContestsContestIdRoute: ApiContestsContestIdRoute,
+  ApiContestsContestIdRoute: ApiContestsContestIdRouteWithChildren,
 }
 
 const ApiContestsRouteWithChildren = ApiContestsRoute._addFileChildren(

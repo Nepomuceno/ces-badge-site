@@ -574,6 +574,29 @@ export async function recordVote(
   return nextState
 }
 
+export async function resetContestVotes(contestId?: string): Promise<EloState> {
+  const resolvedContestId = await resolveContestId(contestId)
+  const { logos } = await getContestLogosInternal(resolvedContestId)
+  const blankState = pruneEntries(ensureEntries({ entries: {}, history: [] }, logos), logos)
+
+  const votesFile = await readVotesFile()
+
+  const nextSchema: VotesFileSchema = {
+    version: VOTE_SCHEMA_VERSION,
+    contests: {
+      ...votesFile.contests,
+      [resolvedContestId]: {
+        state: blankState,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    updatedAt: new Date().toISOString(),
+  }
+
+  await writeVotesFile(nextSchema)
+  return blankState
+}
+
 export async function getContestMetrics(
   contestId: string,
 ): Promise<{

@@ -51,6 +51,7 @@ interface ContestContextValue {
   setActiveContest: (contestId: string) => Promise<void>
   createContest: (input: ContestCreateInput) => Promise<ContestSummary | null>
   updateContest: (contestId: string, input: ContestUpdateInput) => Promise<ContestSummary | null>
+  resetContestVotes: (contestId: string) => Promise<ContestSummary | null>
 }
 
 const STORAGE_KEY = 'ces3-current-contest'
@@ -283,6 +284,32 @@ export function ContestProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const resetContestVotesMutation = useCallback<ContestContextValue['resetContestVotes']>(
+    async (contestId) => {
+      const data = await fetchJson<ContestResponse>(
+        `/api/contests/${encodeURIComponent(contestId)}/reset`,
+        {
+          method: 'POST',
+        },
+      )
+
+      if (data.contest) {
+        const normalized = normalizeContestSummary(data.contest)
+        setContests((prev) => {
+          const filtered = prev.filter((entry) => entry.id !== normalized.id)
+          return [...filtered, normalized].sort((a, b) => a.title.localeCompare(b.title))
+        })
+        if (normalized.isActive) {
+          setActiveContestId(normalized.id)
+        }
+        return normalized
+      }
+
+      return null
+    },
+    [],
+  )
+
   const { activeContest, selectedContest } = useMemo(() => {
     const active = activeContestId ? contests.find((contest) => contest.id === activeContestId) ?? null : null
     const selected = selectedContestId
@@ -305,6 +332,7 @@ export function ContestProvider({ children }: { children: ReactNode }) {
       setActiveContest,
       createContest,
       updateContest: updateContestMutation,
+      resetContestVotes: resetContestVotesMutation,
     }),
     [
       activeContest,
@@ -319,6 +347,7 @@ export function ContestProvider({ children }: { children: ReactNode }) {
       selectedContestId,
       setActiveContest,
       updateContestMutation,
+      resetContestVotesMutation,
     ],
   )
 
