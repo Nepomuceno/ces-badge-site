@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-router'
 
 import Header from '../components/Header'
+import Footer from '../components/Footer'
 
 import appCss from '../styles.css?url'
 
@@ -62,6 +63,7 @@ function RootLayout() {
       <main className="mx-auto w-full max-w-6xl px-6 pb-24">
         <Outlet />
       </main>
+      <Footer />
     </div>
   )
 }
