@@ -330,7 +330,7 @@ function LogoList({ heading, emptyMessage, entries }: LogoListProps) {
         {entries.slice(0, 5).map((entry) => (
           <Link
             key={entry.id}
-            to="/gallery/$logoId"
+            to="/logos/$logoId"
             params={{ logoId: entry.id }}
             className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80 transition hover:border-cyan-300/60 hover:text-white"
           >

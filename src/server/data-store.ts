@@ -7,6 +7,7 @@ import {
   BASE_CATALOG_TIMESTAMP,
   type LogoEntry,
   type SubmitLogoInput,
+  type UpdateLogoInput,
   createCatalogEntry,
   generateCodename,
   normalizeOwnerAlias,
@@ -17,10 +18,12 @@ import {
   pruneEntries,
   ensureEntries,
   parseEloState,
+  createEmptyEntry,
   type EloState,
 } from '../lib/elo-engine'
 import { DEFAULT_CONTEST_ID } from '../lib/contest-utils'
 import { ensureContest, getActiveContestId } from './contest-store'
+import { logVoteRecorded, logVotesReset } from './audit-log'
 import { ensureDataDir, resolveDataPath } from './storage-utils'
 
 const LOGOS_FILE = 'logos.json'
@@ -567,12 +570,11 @@ export async function addLogo(input: SubmitLogoInput): Promise<LogoEntry> {
   return entry
 }
 
-export async function updateLogoOwner(
+export async function updateLogoMetadata(
   id: string,
-  ownerAlias: string | null,
+  updates: UpdateLogoInput,
   contestId?: string,
 ): Promise<LogoEntry | null> {
-  const normalized = normalizeOwnerAlias(ownerAlias)
   const logosFile = await readLogosFile()
   const resolvedContestId = contestId ? await resolveContestId(contestId) : null
 
@@ -586,10 +588,67 @@ export async function updateLogoOwner(
   const target = logosFile.logos[index]!
   const updatedContestId = resolvedContestId ?? target.contestId
 
+  let next: LogoEntry = { ...target }
+  let mutated = false
+
+  if (typeof updates.name === 'string') {
+    const trimmed = updates.name.trim()
+    if (!trimmed) {
+      throw new Error('Logo name cannot be empty.')
+    }
+    if (trimmed !== target.name) {
+      next = {
+        ...next,
+        name: trimmed,
+        codename: generateCodename(trimmed),
+      }
+      mutated = true
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'description')) {
+    const rawDescription = updates.description
+    const normalizedDescription =
+      typeof rawDescription === 'string'
+        ? rawDescription.trim()
+        : rawDescription === null
+          ? ''
+          : null
+
+    const descriptionValue =
+      normalizedDescription && normalizedDescription.length > 0
+        ? normalizedDescription
+        : undefined
+
+    if (descriptionValue !== target.description) {
+      next = {
+        ...next,
+        description: descriptionValue,
+      }
+      mutated = true
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'ownerAlias')) {
+    const normalizedOwner = normalizeOwnerAlias(updates.ownerAlias ?? null)
+    if (normalizedOwner !== target.ownerAlias) {
+      next = {
+        ...next,
+        ownerAlias: normalizedOwner,
+      }
+      mutated = true
+    }
+  }
+
+  if (!mutated) {
+    return target
+  }
+
+  const timestamp = new Date().toISOString()
+
   const updated: LogoEntry = {
-    ...target,
-    ownerAlias: normalized,
-    updatedAt: new Date().toISOString(),
+    ...next,
+    updatedAt: timestamp,
   }
 
   if (updated.assetPath) {
@@ -622,6 +681,20 @@ export async function updateLogoOwner(
   }
 
   return updated
+}
+
+export async function updateLogoOwner(
+  id: string,
+  ownerAlias: string | null,
+  contestId?: string,
+): Promise<LogoEntry | null> {
+  return updateLogoMetadata(
+    id,
+    {
+      ownerAlias,
+    },
+    contestId,
+  )
 }
 
 export async function removeLogo(
@@ -711,9 +784,17 @@ export async function recordVote(
 ): Promise<EloState> {
   const resolvedContestId = await resolveContestId(contestId)
   const { logos } = await getContestLogosInternal(resolvedContestId)
+  const logoIndex = new Map(logos.map((logo) => [logo.id, logo]))
   const votesFile = await readVotesFile()
 
   const { state: ensuredState } = ensureContestVotes(votesFile, resolvedContestId, logos)
+
+  const previousWinner = ensuredState.entries[winnerId]
+    ? { ...ensuredState.entries[winnerId] }
+    : createEmptyEntry()
+  const previousLoser = ensuredState.entries[loserId]
+    ? { ...ensuredState.entries[loserId] }
+    : createEmptyEntry()
 
   const nextState = applyMatch(ensuredState, winnerId, loserId, voterHash)
 
@@ -730,6 +811,56 @@ export async function recordVote(
   }
 
   await writeVotesFile(nextSchema)
+
+  const nextWinner = nextState.entries[winnerId] ?? createEmptyEntry()
+  const nextLoser = nextState.entries[loserId] ?? createEmptyEntry()
+  const latestMatch = nextState.history[0] ?? {
+    winnerId,
+    loserId,
+    timestamp: Date.now(),
+    voterHash,
+  }
+
+  const winnerLogo = logoIndex.get(winnerId)
+  const loserLogo = logoIndex.get(loserId)
+
+  try {
+    await logVoteRecorded({
+      contestId: resolvedContestId,
+      voterHash: latestMatch.voterHash ?? null,
+      matchTimestamp: latestMatch.timestamp,
+      matchHistoryLength: nextState.history.length,
+      winner: {
+        id: winnerId,
+        name: winnerLogo?.name ?? '(unknown)',
+        codename: winnerLogo?.codename ?? winnerLogo?.name ?? '(unknown)',
+        ratingBefore: previousWinner.rating,
+        ratingAfter: nextWinner.rating,
+        winsBefore: previousWinner.wins,
+        winsAfter: nextWinner.wins,
+        lossesBefore: previousWinner.losses,
+        lossesAfter: nextWinner.losses,
+        matchesBefore: previousWinner.matches,
+        matchesAfter: nextWinner.matches,
+      },
+      loser: {
+        id: loserId,
+        name: loserLogo?.name ?? '(unknown)',
+        codename: loserLogo?.codename ?? loserLogo?.name ?? '(unknown)',
+        ratingBefore: previousLoser.rating,
+        ratingAfter: nextLoser.rating,
+        winsBefore: previousLoser.wins,
+        winsAfter: nextLoser.wins,
+        lossesBefore: previousLoser.losses,
+        lossesAfter: nextLoser.losses,
+        matchesBefore: previousLoser.matches,
+        matchesAfter: nextLoser.matches,
+      },
+    })
+  } catch (error) {
+    console.error('Failed to write vote audit event', error)
+  }
+
   return nextState
 }
 
@@ -739,6 +870,8 @@ export async function resetContestVotes(contestId?: string): Promise<EloState> {
   const blankState = pruneEntries(ensureEntries({ entries: {}, history: [] }, logos), logos)
 
   const votesFile = await readVotesFile()
+  const previousState = votesFile.contests[resolvedContestId]?.state ?? { entries: {}, history: [] }
+  const previousMatchCount = previousState.history.length
 
   const nextSchema: VotesFileSchema = {
     version: VOTE_SCHEMA_VERSION,
@@ -753,6 +886,18 @@ export async function resetContestVotes(contestId?: string): Promise<EloState> {
   }
 
   await writeVotesFile(nextSchema)
+
+  try {
+    await logVotesReset({
+      contestId: resolvedContestId,
+      initiator: null,
+      reason: 'manual-reset',
+      previousMatchCount,
+    })
+  } catch (error) {
+    console.error('Failed to write vote reset audit event', error)
+  }
+
   return blankState
 }
 

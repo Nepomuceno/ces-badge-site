@@ -122,7 +122,7 @@ function Home() {
           {featured.map((logo) => (
             <Link
               key={logo.id}
-              to="/gallery/$logoId"
+              to="/logos/$logoId"
               params={{ logoId: logo.id }}
               className="group overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-lg transition hover:-translate-y-1 hover:border-cyan-200/60"
             >

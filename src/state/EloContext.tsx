@@ -148,7 +148,9 @@ export function EloProvider({ children }: { children: React.ReactNode }) {
   )
 
   const skipMatchup = useCallback(() => {
-    setCurrentMatchup(logos.length >= 2 ? produceMatchup(logos, state.entries) : null)
+    setCurrentMatchup((previous) =>
+      logos.length >= 2 ? produceMatchup(logos, state.entries, previous) : null,
+    )
   }, [logos, state.entries])
 
   const rankings = useMemo(() => {

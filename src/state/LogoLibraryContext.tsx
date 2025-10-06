@@ -15,10 +15,11 @@ import {
   sortLogos,
   type LogoEntry,
   type SubmitLogoInput,
+  type UpdateLogoInput,
 } from '../lib/logo-utils'
 import { useContest } from './ContestContext'
 
-export type { LogoEntry, SubmitLogoInput } from '../lib/logo-utils'
+export type { LogoEntry, SubmitLogoInput, UpdateLogoInput } from '../lib/logo-utils'
 
 const seedLogos = sortLogos(logoCatalog.map((logo) => createCatalogEntry(logo)))
 
@@ -30,6 +31,7 @@ interface LogoLibraryContextValue {
   getLogoById: (id: string) => LogoEntry | undefined
   submitLogo: (input: SubmitLogoInput) => Promise<LogoEntry>
   assignOwner: (id: string, ownerAlias: string | null) => void
+  updateLogoDetails: (id: string, updates: UpdateLogoInput) => Promise<LogoEntry>
   removeLogo: (id: string, removedBy: string | null) => Promise<void>
   getLogosSubmittedBy: (email: string, options?: { includeRemoved?: boolean }) => LogoEntry[]
   getLogosOwnedBy: (alias: string, options?: { includeRemoved?: boolean }) => LogoEntry[]
@@ -165,45 +167,58 @@ export function LogoLibraryProvider({ children }: { children: ReactNode }) {
     [contestId],
   )
 
-  const assignOwner = useCallback(
-    (id: string, ownerAlias: string | null) => {
+  const updateLogoDetails = useCallback(
+    async (id: string, updates: UpdateLogoInput): Promise<LogoEntry> => {
       if (!contestId) {
-        console.warn('No contest selected while assigning owner.')
-        return
+        throw new Error('No contest selected while updating logo.')
       }
 
-      void (async () => {
+      const response = await fetch(
+        `/api/logos/${encodeURIComponent(id)}?contestId=${encodeURIComponent(contestId)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updates),
+        },
+      )
+
+      const rawBody = await response.text()
+      let payload: { logo?: LogoEntry; message?: string } = {}
+      if (rawBody) {
         try {
-          const response = await fetch(
-            `/api/logos/${encodeURIComponent(id)}?contestId=${encodeURIComponent(contestId)}`,
-            {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ ownerAlias }),
-            },
-          )
-
-          if (!response.ok) {
-            throw new Error(`Failed to update logo (${response.status})`)
-          }
-
-          const data = (await response.json()) as { logo?: LogoEntry }
-          if (!data.logo) {
-            throw new Error('Server did not return an updated logo entry.')
-          }
-
-          setAllLogos((prev) => {
-            const next = prev.map((logo) => (logo.id === data.logo!.id ? data.logo! : logo))
-            return sortLogos(next)
-          })
+          payload = JSON.parse(rawBody) as { logo?: LogoEntry; message?: string }
         } catch (error) {
-          console.error('Failed to update logo owner', error)
+          console.warn('Failed to parse logo update response payload.', error)
         }
-      })()
+      }
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? `Failed to update logo (${response.status})`)
+      }
+
+      if (!payload.logo) {
+        throw new Error('Server did not return an updated logo entry.')
+      }
+
+      setAllLogos((prev) => {
+        const next = prev.map((logo) => (logo.id === payload.logo!.id ? payload.logo! : logo))
+        return sortLogos(next)
+      })
+
+      return payload.logo
     },
     [contestId],
+  )
+
+  const assignOwner = useCallback(
+    (id: string, ownerAlias: string | null) => {
+      void updateLogoDetails(id, { ownerAlias }).catch((error) => {
+        console.error('Failed to update logo owner', error)
+      })
+    },
+    [updateLogoDetails],
   )
 
   const removeLogo = useCallback(
@@ -271,6 +286,7 @@ export function LogoLibraryProvider({ children }: { children: ReactNode }) {
       getLogoById,
       submitLogo,
       assignOwner,
+      updateLogoDetails,
       removeLogo,
       getLogosSubmittedBy,
       getLogosOwnedBy,
@@ -285,6 +301,7 @@ export function LogoLibraryProvider({ children }: { children: ReactNode }) {
       getLogosSubmittedBy,
       loading,
       logos,
+      updateLogoDetails,
       refresh,
       removeLogo,
       submitLogo,

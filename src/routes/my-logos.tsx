@@ -5,9 +5,9 @@ import { useAuth } from "../state/AuthContext";
 import {
   type LogoEntry,
   type SubmitLogoInput,
+  type UpdateLogoInput,
   useLogoLibrary,
 } from "../state/LogoLibraryContext";
-import { LogoCard } from "../components/LogoCard";
 import { SignInPrompt } from "../components/AuthPrompts";
 import { normalizeAlias } from "../lib/auth-utils";
 
@@ -23,6 +23,7 @@ function MyLogosPage() {
     getLogosSubmittedBy,
     getLogosOwnedBy,
     assignOwner,
+    updateLogoDetails,
     removeLogo,
   } = useLogoLibrary();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -268,11 +269,11 @@ function MyLogosPage() {
                 {latestOwnerAlias && <span>Owner @{latestOwnerAlias}</span>}
               </div>
               <Link
-                to="/gallery/$logoId"
+                to="/logos/$logoId"
                 params={{ logoId: encodeURIComponent(latestSubmission.id) }}
                 className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/40 hover:text-cyan-50"
               >
-                View in gallery
+                View badge details
                 <span aria-hidden>→</span>
               </Link>
             </div>
@@ -354,12 +355,10 @@ function MyLogosPage() {
         ) : (
           <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
             {submitted.map((logo) => (
-              <LogoCard
+              <EditableSubmittedLogo
                 key={logo.id}
                 logo={logo}
-                isFavorite={false}
-                onFavoriteToggle={() => undefined}
-                showFavoriteAction={false}
+                onUpdate={updateLogoDetails}
               />
             ))}
           </div>
@@ -425,6 +424,177 @@ function MyLogosPage() {
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+function EditableSubmittedLogo({
+  logo,
+  onUpdate,
+}: {
+  logo: LogoEntry;
+  onUpdate: (id: string, updates: UpdateLogoInput) => Promise<LogoEntry>;
+}) {
+  const [name, setName] = useState<string>(logo.name);
+  const [description, setDescription] = useState<string>(logo.description ?? "");
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setName(logo.name);
+    setDescription(logo.description ?? "");
+  }, [logo.description, logo.id, logo.name]);
+
+  const codenamePreview = useMemo(() => generateCodename(name), [name]);
+
+  const trimmedName = name.trim();
+  const trimmedDescription = description.trim();
+  const originalDescription = (logo.description ?? "").trim();
+
+  const hasNameChanged = trimmedName !== logo.name;
+  const hasDescriptionChanged = trimmedDescription !== originalDescription;
+  const hasChanges = hasNameChanged || hasDescriptionChanged;
+
+  const handleSave = async () => {
+    if (trimmedName.length === 0) {
+      setError("Name cannot be empty.");
+      setStatus(null);
+      return;
+    }
+
+    const updates: UpdateLogoInput = {};
+    if (hasNameChanged) {
+      updates.name = trimmedName;
+    }
+    if (hasDescriptionChanged) {
+      updates.description = trimmedDescription.length > 0 ? trimmedDescription : null;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      setStatus("Nothing to update yet.");
+      setError(null);
+      return;
+    }
+
+    setIsSaving(true);
+    setStatus(null);
+    setError(null);
+
+    try {
+      const updated = await onUpdate(logo.id, updates);
+      setName(updated.name);
+      setDescription(updated.description ?? "");
+      setStatus("Details saved");
+      setTimeout(() => setStatus(null), 4000);
+    } catch (updateError) {
+      console.error("Failed to update logo metadata", updateError);
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Failed to update logo details."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReset = () => {
+    setName(logo.name);
+    setDescription(logo.description ?? "");
+    setStatus(null);
+    setError(null);
+  };
+
+  return (
+    <div className="flex flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_20px_45px_rgba(5,16,32,0.45)] backdrop-blur">
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <div className="flex h-40 w-full items-center justify-center rounded-2xl border border-white/10 bg-slate-950/40 sm:w-40">
+          <img
+            src={logo.image}
+            alt={logo.name}
+            className="max-h-full max-w-full object-contain"
+            loading="lazy"
+          />
+        </div>
+        <div className="flex-1 space-y-2 text-sm text-white/70">
+          <p className="text-xs uppercase tracking-[0.3em] text-white/50">
+            {logo.codename}
+          </p>
+          <h3 className="text-xl font-semibold text-white">{logo.name}</h3>
+          {logo.submittedBy && (
+            <p className="text-xs uppercase tracking-[0.25em] text-cyan-200/70">
+              Submitted by {logo.submittedBy}
+            </p>
+          )}
+          {logo.ownerAlias && (
+            <p className="text-xs uppercase tracking-[0.2em] text-white/40">
+              Owned by @{logo.ownerAlias}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Link
+              to="/logos/$logoId"
+              params={{ logoId: encodeURIComponent(logo.id) }}
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-white transition hover:border-cyan-300 hover:text-cyan-100"
+            >
+              View details
+              <span aria-hidden>↗</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <label className="flex flex-col gap-2 text-sm text-white/70">
+          Name
+          <input
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="rounded-full border border-white/20 bg-slate-950/60 px-4 py-3 text-white outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/40"
+          />
+        </label>
+        <div className="flex flex-col gap-1 text-xs uppercase tracking-[0.25em] text-white/50">
+          <span>Codename preview</span>
+          <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-white/70">
+            {codenamePreview || "—"}
+          </span>
+          <span className="text-[10px] normal-case text-white/40">
+            Updates automatically from the name.
+          </span>
+        </div>
+        <label className="flex flex-col gap-2 text-sm text-white/70">
+          Description
+          <textarea
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            rows={3}
+            className="rounded-2xl border border-white/20 bg-slate-950/60 px-4 py-3 text-white outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/40"
+            placeholder="Optional context for voters"
+          />
+        </label>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving || !hasChanges}
+            className="rounded-full bg-cyan-400 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSaving ? "Saving…" : "Save changes"}
+          </button>
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={isSaving || !hasChanges}
+            className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-white transition hover:border-cyan-300 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Reset
+          </button>
+        </div>
+        {status && <p className="text-xs text-cyan-200/80">{status}</p>}
+        {error && <p className="text-xs text-rose-300/80">{error}</p>}
+      </div>
     </div>
   );
 }

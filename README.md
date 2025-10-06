@@ -102,6 +102,19 @@ bun scripts/import-graph-users.ts \
   Add your custom `DATA_DIR` path to `.gitignore` if you move the storage location.
 - If you need a clean redeploy, set `RESET_APP=true` (or `RESET_ENVIRONMENT=true`) when running the script to delete the existing Container App or the entire environment before provisioning.
 
+## Vote audit logging
+
+- Every recorded matchup now appends a structured line to `vote-events.ndjson` inside the configured `DATA_DIR`.
+- Entries are newline-delimited JSON objects with the shape:
+  - `type`: either `"vote-recorded"` or `"votes-reset"`
+  - `occurredAt`: ISO-8601 timestamp of when the event was captured
+  - `contestId`: contest the action belongs to
+  - `winner` / `loser`: include ids, names, codenames, and Elo stats before/after the match
+  - `voterHash`: hashed identifier if supplied by the client (may be `null`)
+  - `matchTimestamp`: raw millisecond timestamp from the Elo history entry
+- Vote resets (triggered via the admin UI or API) emit a `votes-reset` entry that notes why the reset happened and how many matches existed beforehand.
+- Use `jq` or any log shipper that understands ndjson to stream the file for investigations when votes appear to go missing.
+
 ## Troubleshooting
 
 - **Alias not found** → Confirm the alias exists in the roster (comparison uses the lowercased value). Update the JSON if the teammate is missing.

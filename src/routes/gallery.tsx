@@ -1,4 +1,4 @@
-import { Outlet, createFileRoute, useRouterState } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 
 import { LogoCard } from '../components/LogoCard'
@@ -13,20 +13,6 @@ function GalleryPage() {
   const [query, setQuery] = useState('')
   const { favorites, toggleFavorite } = useFavorites()
   const { logos } = useLogoLibrary()
-  const { hasDetail, selectedLogoId } = useRouterState({
-    select: (state) => {
-      const detailMatch = state.matches.find((match) => match.id === '/gallery/$logoId')
-      const logoId =
-        detailMatch && 'params' in detailMatch
-          ? (detailMatch.params as { logoId?: string }).logoId ?? null
-          : null
-
-      return {
-        hasDetail: Boolean(detailMatch),
-        selectedLogoId: logoId,
-      }
-    },
-  })
 
   const normalizedQuery = query.trim().toLowerCase()
 
@@ -47,12 +33,8 @@ function GalleryPage() {
     })
   }, [logos, normalizedQuery])
 
-  const detailOutlet = <Outlet />
-
   return (
     <div className="space-y-10 pb-10">
-      {hasDetail && detailOutlet}
-
       <header className="space-y-4">
         <p className="text-sm uppercase tracking-[0.3em] text-cyan-200/70">
           CES3 design catalog
@@ -88,7 +70,6 @@ function GalleryPage() {
             logo={logo}
             isFavorite={favorites.has(logo.id)}
             onFavoriteToggle={toggleFavorite}
-            isActive={logo.id === selectedLogoId}
           />
         ))}
         {filtered.length === 0 && (

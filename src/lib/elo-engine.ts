@@ -28,6 +28,10 @@ export interface Matchup {
   challenger: LogoEntry
 }
 
+function createPairKey(a: string, b: string): string {
+  return [a, b].sort().join('|')
+}
+
 export function normalizeVoterHash(value: string | null | undefined): string | null {
   if (!value) {
     return null
@@ -238,10 +242,15 @@ export function applyMatch(
 export function produceMatchup(
   logos: LogoEntry[],
   entries: Record<string, EloEntry>,
+  previousMatchup: Matchup | null = null,
 ): Matchup | null {
   if (logos.length < 2) {
     return null
   }
+
+  const avoidedKey = previousMatchup
+    ? createPairKey(previousMatchup.primary.id, previousMatchup.challenger.id)
+    : null
 
   const catalogEntries = logos.map((logo) => ({
     logo,
@@ -255,26 +264,38 @@ export function produceMatchup(
     return a.entry.matches - b.entry.matches
   })
 
-  const primary = sortedByMatches[0]
-  const candidates = catalogEntries
-    .filter((candidate) => candidate.logo.id !== primary.logo.id)
-    .sort((a, b) => {
-      const diffA = Math.abs(a.entry.rating - primary.entry.rating)
-      const diffB = Math.abs(b.entry.rating - primary.entry.rating)
-      if (diffA === diffB) {
-        return a.entry.matches - b.entry.matches
+  let fallback: Matchup | null = null
+
+  for (const primary of sortedByMatches) {
+    const candidates = catalogEntries
+      .filter((candidate) => candidate.logo.id !== primary.logo.id)
+      .sort((a, b) => {
+        const diffA = Math.abs(a.entry.rating - primary.entry.rating)
+        const diffB = Math.abs(b.entry.rating - primary.entry.rating)
+        if (diffA === diffB) {
+          return a.entry.matches - b.entry.matches
+        }
+        return diffA - diffB
+      })
+
+    const firstCandidate = candidates[0]
+    if (primary && firstCandidate && !fallback) {
+      fallback = {
+        primary: primary.logo,
+        challenger: firstCandidate.logo,
       }
-      return diffA - diffB
-    })
+    }
 
-  const challenger = candidates[0] ?? sortedByMatches[1]
-
-  if (!primary || !challenger) {
-    return null
+    for (const candidate of candidates) {
+      if (avoidedKey && createPairKey(primary.logo.id, candidate.logo.id) === avoidedKey) {
+        continue
+      }
+      return {
+        primary: primary.logo,
+        challenger: candidate.logo,
+      }
+    }
   }
 
-  return {
-    primary: primary.logo,
-    challenger: challenger.logo,
-  }
+  return fallback
 }

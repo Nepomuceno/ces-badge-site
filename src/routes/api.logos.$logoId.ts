@@ -4,8 +4,9 @@ import {
   findLogoById,
   getAllLogosIncludingRemoved,
   removeLogo,
-  updateLogoOwner,
+  updateLogoMetadata,
 } from '../server/data-store'
+import type { UpdateLogoInput } from '../lib/logo-utils'
 
 function jsonResponse(body: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -43,10 +44,62 @@ export const Route = createFileRoute('/api/logos/$logoId')({
           const url = new URL(request.url)
           const contestIdParam = url.searchParams.get('contestId') ?? undefined
           const fallback = contestIdParam ? null : await findLogoById(params.logoId)
-          const { ownerAlias } = (await request.json()) as { ownerAlias?: string | null }
-          const updated = await updateLogoOwner(
+
+          let payload: Record<string, unknown> = {}
+          try {
+            payload = (await request.json()) as Record<string, unknown>
+          } catch (error) {
+            console.warn('No JSON payload provided for logo update.', error)
+          }
+
+          const updates: UpdateLogoInput = {}
+          let hasField = false
+
+          if (typeof payload.name === 'string') {
+            const trimmed = payload.name.trim()
+            if (!trimmed) {
+              return jsonResponse({ message: 'Name cannot be empty.' }, { status: 400 })
+            }
+            updates.name = trimmed
+            hasField = true
+          }
+
+          if (Object.prototype.hasOwnProperty.call(payload, 'description')) {
+            const value = payload.description
+            if (typeof value === 'string' || value === null) {
+              updates.description = value
+              hasField = true
+            } else {
+              return jsonResponse(
+                { message: 'Description must be a string or null.' },
+                { status: 400 },
+              )
+            }
+          }
+
+          if (Object.prototype.hasOwnProperty.call(payload, 'ownerAlias')) {
+            const value = payload.ownerAlias
+            if (typeof value === 'string' || value === null) {
+              updates.ownerAlias = value
+              hasField = true
+            } else {
+              return jsonResponse(
+                { message: 'Owner alias must be a string or null.' },
+                { status: 400 },
+              )
+            }
+          }
+
+          if (!hasField) {
+            return jsonResponse(
+              { message: 'No valid fields to update.' },
+              { status: 400 },
+            )
+          }
+
+          const updated = await updateLogoMetadata(
             params.logoId,
-            ownerAlias ?? null,
+            updates,
             contestIdParam ?? fallback?.contestId,
           )
           if (!updated) {
@@ -54,7 +107,7 @@ export const Route = createFileRoute('/api/logos/$logoId')({
           }
           return jsonResponse({ logo: updated })
         } catch (error) {
-          console.error('Failed to update logo owner', error)
+          console.error('Failed to update logo metadata', error)
           const message = error instanceof Error ? error.message : 'Failed to update logo.'
           return jsonResponse({ message }, { status: 400 })
         }

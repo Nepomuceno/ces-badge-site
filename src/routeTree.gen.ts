@@ -19,6 +19,7 @@ import { Route as ContestsRouteImport } from './routes/contests'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AccessDeniedRouteImport } from './routes/access-denied'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LogosLogoIdRouteImport } from './routes/logos.$logoId'
 import { Route as GalleryLogoIdRouteImport } from './routes/gallery.$logoId'
 import { Route as ApiVotesRouteImport } from './routes/api.votes'
 import { Route as ApiLogosRouteImport } from './routes/api.logos'
@@ -80,6 +81,11 @@ const AccessDeniedRoute = AccessDeniedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LogosLogoIdRoute = LogosLogoIdRouteImport.update({
+  id: '/logos/$logoId',
+  path: '/logos/$logoId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GalleryLogoIdRoute = GalleryLogoIdRouteImport.update({
@@ -161,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/api/logos': typeof ApiLogosRouteWithChildren
   '/api/votes': typeof ApiVotesRoute
   '/gallery/$logoId': typeof GalleryLogoIdRoute
+  '/logos/$logoId': typeof LogosLogoIdRoute
   '/api/contests/$contestId': typeof ApiContestsContestIdRouteWithChildren
   '/api/logos/$logoId': typeof ApiLogosLogoIdRouteWithChildren
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
@@ -185,6 +192,7 @@ export interface FileRoutesByTo {
   '/api/logos': typeof ApiLogosRouteWithChildren
   '/api/votes': typeof ApiVotesRoute
   '/gallery/$logoId': typeof GalleryLogoIdRoute
+  '/logos/$logoId': typeof LogosLogoIdRoute
   '/api/contests/$contestId': typeof ApiContestsContestIdRouteWithChildren
   '/api/logos/$logoId': typeof ApiLogosLogoIdRouteWithChildren
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
@@ -210,6 +218,7 @@ export interface FileRoutesById {
   '/api/logos': typeof ApiLogosRouteWithChildren
   '/api/votes': typeof ApiVotesRoute
   '/gallery/$logoId': typeof GalleryLogoIdRoute
+  '/logos/$logoId': typeof LogosLogoIdRoute
   '/api/contests/$contestId': typeof ApiContestsContestIdRouteWithChildren
   '/api/logos/$logoId': typeof ApiLogosLogoIdRouteWithChildren
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
@@ -236,6 +245,7 @@ export interface FileRouteTypes {
     | '/api/logos'
     | '/api/votes'
     | '/gallery/$logoId'
+    | '/logos/$logoId'
     | '/api/contests/$contestId'
     | '/api/logos/$logoId'
     | '/demo/start/api-request'
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/api/logos'
     | '/api/votes'
     | '/gallery/$logoId'
+    | '/logos/$logoId'
     | '/api/contests/$contestId'
     | '/api/logos/$logoId'
     | '/demo/start/api-request'
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/api/logos'
     | '/api/votes'
     | '/gallery/$logoId'
+    | '/logos/$logoId'
     | '/api/contests/$contestId'
     | '/api/logos/$logoId'
     | '/demo/start/api-request'
@@ -308,6 +320,7 @@ export interface RootRouteChildren {
   ApiContestsRoute: typeof ApiContestsRouteWithChildren
   ApiLogosRoute: typeof ApiLogosRouteWithChildren
   ApiVotesRoute: typeof ApiVotesRoute
+  LogosLogoIdRoute: typeof LogosLogoIdRoute
   DemoStartApiRequestRoute: typeof DemoStartApiRequestRoute
   DemoStartServerFuncsRoute: typeof DemoStartServerFuncsRoute
 }
@@ -382,6 +395,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logos/$logoId': {
+      id: '/logos/$logoId'
+      path: '/logos/$logoId'
+      fullPath: '/logos/$logoId'
+      preLoaderRoute: typeof LogosLogoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gallery/$logoId': {
@@ -545,6 +565,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContestsRoute: ApiContestsRouteWithChildren,
   ApiLogosRoute: ApiLogosRouteWithChildren,
   ApiVotesRoute: ApiVotesRoute,
+  LogosLogoIdRoute: LogosLogoIdRoute,
   DemoStartApiRequestRoute: DemoStartApiRequestRoute,
   DemoStartServerFuncsRoute: DemoStartServerFuncsRoute,
 }

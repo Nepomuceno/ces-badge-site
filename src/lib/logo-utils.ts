@@ -13,6 +13,12 @@ export interface SubmitLogoInput {
   contestId?: string
 }
 
+export interface UpdateLogoInput {
+  name?: string
+  description?: string | null
+  ownerAlias?: string | null
+}
+
 export interface LogoEntry {
   id: string
   contestId: string
