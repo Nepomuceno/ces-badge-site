@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ces3-maskable-gradient" x1="20%" y1="0%" x2="80%" y2="96%">
+      <stop offset="0%" stop-color="#2FFCF3" />
+      <stop offset="50%" stop-color="#2E7BFF" />
+      <stop offset="100%" stop-color="#7D3BFF" />
+    </linearGradient>
+    <radialGradient id="ces3-maskable-glow" cx="50%" cy="40%" r="68%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.32" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#ces3-maskable-gradient)" />
+  <circle cx="256" cy="210" r="192" fill="url(#ces3-maskable-glow)" />
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="24" transform="translate(96 104)">
+    <path d="M140 226c-60 0-108-48-108-108S80 10 140 10c30 0 57 12 77 31" stroke="#C6F7FF" opacity=".7" />
+    <path d="M216 70c12-6 26-10 41-10 47 0 86 39 86 86s-39 86-86 86c-22 0-42-8-57-22" stroke="#071A39" opacity=".25" />
+    <path d="M205 90c10-6 23-9 36-9 38 0 70 31 70 70s-31 70-70 70c-19 0-36-7-49-18" stroke="#FFFFFF" />
+  </g>
+  <g font-family="'DM Sans', 'Segoe UI', sans-serif" font-weight="600" fill="#FFFFFF" text-anchor="middle">
+    <text x="256" y="356" font-size="104" letter-spacing="24">CES</text>
+    <text x="362" y="356" font-size="104">³</text>
+  </g>
+</svg>

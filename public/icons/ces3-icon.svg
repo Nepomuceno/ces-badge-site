@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="96" height="96" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ces3-icon-gradient" x1="16%" y1="8%" x2="84%" y2="92%">
+      <stop offset="0%" stop-color="#38F8FF" />
+      <stop offset="55%" stop-color="#2E7BFF" />
+      <stop offset="100%" stop-color="#7D3BFF" />
+    </linearGradient>
+    <radialGradient id="ces3-icon-glow" cx="50%" cy="42%" r="58%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.45" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <g fill="none" fill-rule="evenodd">
+    <rect width="96" height="96" rx="28" fill="url(#ces3-icon-gradient)" />
+    <circle cx="48" cy="40" r="32" fill="url(#ces3-icon-glow)" />
+    <g transform="translate(20 22)">
+      <path d="M21.4 32.72c-8.24 0-15.02-6.78-15.02-15.02C6.38 9.46 13.16 2.68 21.4 2.68c4.1 0 7.86 1.58 10.66 4.3" stroke="#D7F6FF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" opacity=".7" />
+      <path d="M33.24 11.56c1.9-1.04 4.14-1.64 6.52-1.64 7.33 0 13.27 5.94 13.27 13.27 0 7.33-5.94 13.27-13.27 13.27-3.4 0-6.52-1.28-8.86-3.39" stroke="#081B3C" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".3" />
+      <path d="M31.48 14.64c1.62-1 3.73-1.6 5.97-1.6 5.9 0 10.68 4.78 10.68 10.68 0 5.9-4.78 10.68-10.68 10.68-2.88 0-5.5-1.14-7.39-2.98" stroke="#FDFEFF" stroke-width="3.3" stroke-linecap="round" stroke-linejoin="round" />
+      <text font-family="'DM Sans', 'Segoe UI', sans-serif" font-size="20" font-weight="600" letter-spacing="3.2" fill="#FFFFFF" x="2" y="48">CES</text>
+      <text font-family="'DM Sans', 'Segoe UI', sans-serif" font-size="20" font-weight="600" fill="#F2FEFF" x="52" y="48">³</text>
+    </g>
+  </g>
+</svg>

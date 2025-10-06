@@ -1,0 +1,21 @@
+# Dependencies
+node_modules
+
+# Build outputs
+.dist
+.dist-ssr
+dist
+dist-ssr
+.output
+server/runtime-data
+
+# Environment & tooling
+.env*
+*.log
+.vscode
+.idea
+coverage
+
+# Git metadata
+.git
+.gitignore
