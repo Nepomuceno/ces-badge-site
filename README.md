@@ -123,6 +123,20 @@ bun scripts/import-graph-users.ts \
 - You can manually roll back by copying a snapshot from the backup folder over the live file; the next write will produce a fresh backup entry.
 - Vote resets still preserve prior history—use the backup snapshots to recover the pre-reset standings if the action was accidental.
 
+### Merge historical vote snapshots
+
+If older backups exist from before the durability fixes, use `scripts/merge-votes.ts` to consolidate them into a fresh `votes.json`:
+
+```bash
+bun scripts/merge-votes.ts --input /path/to/vote-backups --output server/runtime-data/votes.json
+```
+
+- `--input` should point to a folder containing one or more vote snapshots (any `*.json` files are processed).
+- By default the script writes to `server/runtime-data/votes.json`; override with `--output` if you want to preview elsewhere. Add `--dry-run` to inspect the merged stats without writing anything.
+- The script deduplicates identical match entries, recomputes Elo standings from the combined history, and preserves the canonical contest roster from `server/runtime-data/logos.json` (override with `--logos`).
+- Use `--contest` to restrict the merge to specific contest ids, or `--max-history 0` if you need to retain the entire historical match log instead of the usual 1,000-entry ring buffer.
+- Any gaps detected between participant match counts and available history will be reported at the end so you know if additional data needs to be recovered.
+
 ## Troubleshooting
 
 - **Alias not found** → Confirm the alias exists in the roster (comparison uses the lowercased value). Update the JSON if the teammate is missing.
