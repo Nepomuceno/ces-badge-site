@@ -6,6 +6,7 @@ import { useLogoLibrary } from '../state/LogoLibraryContext'
 import { useAuth } from '../state/AuthContext'
 import { SignInPrompt } from '../components/AuthPrompts'
 import { hashAliasForVoting } from '../lib/auth-utils'
+import { calculateTotalMatches } from '../lib/elo-engine'
 
 export const Route = createFileRoute('/scores')({
   component: ScoresPage,
@@ -42,7 +43,7 @@ function ScoresPage() {
     }
   }, [user?.alias])
 
-  const totalMatches = recentHistory.length
+  const totalMatches = useMemo(() => calculateTotalMatches(ratings), [ratings])
   const averageRating = useMemo(() => {
     const values = Object.values(ratings)
     if (values.length === 0) {

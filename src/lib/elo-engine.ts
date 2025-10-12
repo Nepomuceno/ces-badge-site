@@ -2,7 +2,7 @@ import type { LogoEntry } from './logo-utils'
 
 export const DEFAULT_RATING = 1500
 export const K_FACTOR = 32
-export const HISTORY_LIMIT = 1000
+export const HISTORY_LIMIT = 20000
 
 export interface EloEntry {
   rating: number
@@ -26,6 +26,22 @@ export interface EloState {
 export interface Matchup {
   primary: LogoEntry
   challenger: LogoEntry
+}
+
+export function calculateTotalMatches(entries: Record<string, EloEntry>): number {
+  const totalMatches = Object.values(entries).reduce((acc, entry) => acc + entry.matches, 0)
+
+  if (totalMatches <= 0) {
+    return 0
+  }
+
+  const aggregate = totalMatches / 2
+  if (Number.isInteger(aggregate)) {
+    return aggregate
+  }
+
+  // Fallback guards against inconsistent data where the tally is uneven.
+  return Math.floor(aggregate)
 }
 
 function createPairKey(a: string, b: string): string {
@@ -197,6 +213,7 @@ export function applyMatch(
   winnerId: string,
   loserId: string,
   voterHash: string | null,
+  options: { timestamp?: number } = {},
 ): EloState {
   const winner = state.entries[winnerId] ?? createEmptyEntry()
   const loser = state.entries[loserId] ?? createEmptyEntry()
@@ -227,7 +244,7 @@ export function applyMatch(
     {
       winnerId,
       loserId,
-      timestamp: Date.now(),
+      timestamp: options.timestamp ?? Date.now(),
       voterHash: normalizeVoterHash(voterHash),
     },
     ...state.history,

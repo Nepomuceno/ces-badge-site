@@ -52,6 +52,43 @@ interface ContestContextValue {
   createContest: (input: ContestCreateInput) => Promise<ContestSummary | null>
   updateContest: (contestId: string, input: ContestUpdateInput) => Promise<ContestSummary | null>
   resetContestVotes: (contestId: string) => Promise<ContestSummary | null>
+  recalculateContestElo: (
+    contestId: string,
+    options?: { dryRun?: boolean },
+  ) => Promise<ContestEloRecalculationResponse>
+}
+
+export interface ContestEloRecalculationDifference {
+  logoId: string
+  logoName: string
+  logoCodename: string
+  ratingBefore: number
+  ratingAfter: number
+  ratingDelta: number
+  winsBefore: number
+  winsAfter: number
+  lossesBefore: number
+  lossesAfter: number
+  matchesBefore: number
+  matchesAfter: number
+  matchesDelta: number
+}
+
+export interface ContestEloRecalculationSummary {
+  totalMatches: number
+  changedCount: number
+  changesDetected: boolean
+  lastMatchAt: string | null
+}
+
+export interface ContestEloRecalculationResponse {
+  dryRun: boolean
+  applied: boolean
+  message: string
+  summary: ContestEloRecalculationSummary
+  differences: ContestEloRecalculationDifference[]
+  proposedLeaderboard: ContestSummary['leaderboard']
+  contest?: ContestSummary
 }
 
 const STORAGE_KEY = 'ces3-current-contest'
@@ -310,6 +347,44 @@ export function ContestProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const recalculateContestElo = useCallback<ContestContextValue['recalculateContestElo']>(
+    async (contestId, options) => {
+      const payload = {
+        dryRun: options?.dryRun ?? false,
+      }
+
+      const data = await fetchJson<ContestEloRecalculationResponse>(
+        `/api/contests/${encodeURIComponent(contestId)}/recalculate-elo`,
+        {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        },
+      )
+
+      const normalizedContest = data.contest ? normalizeContestSummary(data.contest) : undefined
+
+      if (!data.dryRun && normalizedContest) {
+        setContests((prev) => {
+          const filtered = prev.filter((entry) => entry.id !== normalizedContest.id)
+          return [...filtered, normalizedContest].sort((a, b) => a.title.localeCompare(b.title))
+        })
+
+        if (normalizedContest.isActive) {
+          setActiveContestId(normalizedContest.id)
+        }
+      }
+
+      return {
+        ...data,
+        contest: normalizedContest,
+      }
+    },
+    [],
+  )
+
   const { activeContest, selectedContest } = useMemo(() => {
     const active = activeContestId ? contests.find((contest) => contest.id === activeContestId) ?? null : null
     const selected = selectedContestId
@@ -333,6 +408,7 @@ export function ContestProvider({ children }: { children: ReactNode }) {
       createContest,
       updateContest: updateContestMutation,
       resetContestVotes: resetContestVotesMutation,
+      recalculateContestElo,
     }),
     [
       activeContest,
@@ -341,6 +417,7 @@ export function ContestProvider({ children }: { children: ReactNode }) {
       createContest,
       error,
       loading,
+      recalculateContestElo,
       refresh,
       selectContest,
       selectedContest,

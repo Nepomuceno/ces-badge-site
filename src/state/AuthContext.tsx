@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: parsed.email ?? `${normalizedAlias}@microsoft.com`,
           name: parsed.name ?? normalizedAlias,
           logos: Array.isArray(parsed.logos) ? parsed.logos : [],
-          role: parsed.role === 'admin' ? 'admin' : 'member',
+            role: parsed.role === 'admin' ? 'admin' : 'member',
           source: parsed.source === 'admin' ? 'admin' : 'alias',
           hasPassword: Boolean(parsed.hasPassword),
         }

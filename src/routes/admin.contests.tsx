@@ -5,6 +5,7 @@ import { AccessDeniedMessage, SignInPrompt } from '../components/AuthPrompts'
 import type { ContestStatus } from '../lib/contest-utils'
 import { useAuth } from '../state/AuthContext'
 import { useContest } from '../state/ContestContext'
+import type { ContestEloRecalculationResponse } from '../state/ContestContext'
 
 export const Route = createFileRoute('/admin/contests')({
   component: AdminContestsPage,
@@ -156,6 +157,8 @@ function AdminContestsPage() {
   } | null>(null)
   const [cardNotices, setCardNotices] = useState<Record<string, MessageState>>({})
 
+  const canManage = isAdmin
+
   const orderedContests = useContestCards(contests)
 
   const handleCreateSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -227,11 +230,11 @@ function AdminContestsPage() {
     )
   }
 
-  if (!isAdmin) {
+  if (!canManage) {
     return (
       <AccessDeniedMessage
         title="Admin access required"
-        description="Only CES3 admins can manage contest settings. Ask the brand council to promote your alias."
+        description="Only CES3 admins can manage contest settings. Ask the brand council to grant access."
         hint="Need elevated access? Email the app admin."
       />
     )
@@ -459,6 +462,7 @@ function AdminContestsPage() {
                   key={contest.id}
                   contest={contest}
                   isActive={contest.id === activeContestId}
+                  canManage={canManage}
                   onUpdate={async (payload) => {
                     setBusyContest({ id: contest.id, action: 'update' })
                     setCardNotices((prev) => ({ ...prev, [contest.id]: null }))
@@ -538,6 +542,7 @@ interface ContestCardProps {
   busy: boolean
   busyAction: 'update' | 'activate' | 'reset' | null
   notice: MessageState
+  canManage: boolean
   onUpdate: (payload: Parameters<ReturnType<typeof useContest>['updateContest']>[1]) => Promise<void>
   onSetActive: () => Promise<void>
   onResetVotes: () => Promise<void>
@@ -556,7 +561,17 @@ function computeEndsAtFromDuration(startsAtLocal: string, durationDays: string):
   return toDateTimeLocal(startDate.toISOString())
 }
 
-function ContestCard({ contest, isActive, busy, busyAction, notice, onUpdate, onSetActive, onResetVotes }: ContestCardProps) {
+function ContestCard({
+  contest,
+  isActive,
+  busy,
+  busyAction,
+  notice,
+  canManage,
+  onUpdate,
+  onSetActive,
+  onResetVotes,
+}: ContestCardProps) {
   const [form, setForm] = useState<ContestFormState>(() => ({
     title: contest.title,
     slug: contest.slug,
@@ -572,6 +587,11 @@ function ContestCard({ contest, isActive, busy, busyAction, notice, onUpdate, on
 
   const [updating, setUpdating] = useState(false)
   const [localNotice, setLocalNotice] = useState<MessageState>(null)
+  const { recalculateContestElo } = useContest()
+  const [recalcPreview, setRecalcPreview] = useState<ContestEloRecalculationResponse | null>(null)
+  const [recalcLoading, setRecalcLoading] = useState(false)
+  const [recalcError, setRecalcError] = useState<string | null>(null)
+  const [recalcMode, setRecalcMode] = useState<'preview' | 'apply' | null>(null)
 
   useEffect(() => {
     setForm({
@@ -632,6 +652,63 @@ function ContestCard({ contest, isActive, busy, busyAction, notice, onUpdate, on
       setUpdating(false)
     }
   }
+
+  const handlePreviewRecalc = async () => {
+    setRecalcMode('preview')
+    setRecalcLoading(true)
+    setRecalcError(null)
+    try {
+      const response = await recalculateContestElo(contest.id, { dryRun: true })
+      setRecalcPreview(response)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to preview Elo recalculation.'
+      setRecalcError(message)
+    } finally {
+      setRecalcLoading(false)
+      setRecalcMode(null)
+    }
+  }
+
+  const handleApplyRecalc = async () => {
+    const confirmed =
+      typeof window === 'undefined'
+        ? true
+        : window.confirm(
+            'Recalculate Elo ratings using historical vote events? This will overwrite current ratings.',
+          )
+    if (!confirmed) {
+      return
+    }
+
+    setRecalcMode('apply')
+    setRecalcLoading(true)
+    setRecalcError(null)
+    try {
+      const response = await recalculateContestElo(contest.id, { dryRun: false })
+      setRecalcPreview(response)
+      setLocalNotice({ tone: 'success', text: response.message })
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to apply Elo recalculation.'
+      setRecalcError(message)
+    } finally {
+      setRecalcLoading(false)
+      setRecalcMode(null)
+    }
+  }
+
+  const previewSummary = recalcPreview?.summary ?? null
+  const differenceCount = recalcPreview?.differences.length ?? 0
+  const showApplyButton = Boolean(recalcPreview?.dryRun && previewSummary?.changesDetected)
+  const recalculationApplied = recalcPreview?.applied ?? false
+  const previewButtonLabel =
+    recalcMode === 'preview'
+      ? 'Running…'
+      : recalcPreview
+        ? 'Re-run preview'
+        : 'Preview recalculation'
+  const applyButtonLabel = recalcMode === 'apply' ? 'Applying…' : 'Apply changes'
 
   const statusBadgeClass =
     contest.status === 'active'
@@ -861,6 +938,121 @@ function ContestCard({ contest, isActive, busy, busyAction, notice, onUpdate, on
         </p>
       </div>
 
+  {canManage && (
+          <section className="space-y-4 rounded-2xl border border-cyan-300/30 bg-cyan-300/10 p-4 text-sm text-white/80">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-cyan-200/70">Elo maintenance</p>
+                <h4 className="text-base font-semibold text-white">Recalculate from vote history</h4>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handlePreviewRecalc}
+                  className="rounded-full border border-cyan-300/40 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100 transition hover:border-cyan-200 hover:text-cyan-50 disabled:cursor-not-allowed disabled:border-white/20 disabled:text-white/30"
+                  disabled={busy || recalcLoading}
+                >
+                  {previewButtonLabel}
+                </button>
+                {showApplyButton && (
+                  <button
+                    type="button"
+                    onClick={handleApplyRecalc}
+                    className="rounded-full border border-emerald-300/50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100 transition hover:border-emerald-200 hover:text-emerald-50 disabled:cursor-not-allowed disabled:border-white/20 disabled:text-white/30"
+                    disabled={busy || recalcLoading}
+                  >
+                    {applyButtonLabel}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {recalcError && (
+              <p className="rounded-2xl border border-rose-400/40 bg-rose-400/10 px-4 py-2 text-sm text-rose-100">
+                {recalcError}
+              </p>
+            )}
+
+            {recalcPreview && previewSummary && (
+              <div className="space-y-3">
+                <p className="font-semibold text-white/90">{recalcPreview.message}</p>
+                <div className="flex flex-wrap gap-4 text-xs uppercase tracking-[0.25em] text-white/50">
+                  <span>
+                    Matches replayed {previewSummary.totalMatches.toLocaleString()}
+                  </span>
+                  <span>
+                    Changes {differenceCount} {differenceCount === 1 ? 'logo' : 'logos'}
+                  </span>
+                  <span>
+                    Last match {previewSummary.lastMatchAt ? new Date(previewSummary.lastMatchAt).toLocaleString() : 'n/a'}
+                  </span>
+                </div>
+
+                {differenceCount === 0 ? (
+                  <p className="text-sm text-white/70">
+                    Elo ratings already align with the recorded vote history; no adjustments are required.
+                  </p>
+                ) : (
+                  <ul className="space-y-3">
+                    {recalcPreview.differences.map((diff) => {
+                      const ratingDeltaClass = diff.ratingDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'
+                      return (
+                        <li
+                          key={diff.logoId}
+                          className="rounded-2xl border border-white/10 bg-slate-900/50 p-3"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-semibold text-white">{diff.logoName}</p>
+                              <p className="text-[0.6rem] uppercase tracking-[0.3em] text-white/40">
+                                {diff.logoCodename}
+                              </p>
+                            </div>
+                            <p className={`text-sm font-semibold ${ratingDeltaClass}`}>
+                              {formatRatingValue(diff.ratingBefore)} → {formatRatingValue(diff.ratingAfter)} ({formatDeltaValue(diff.ratingDelta)})
+                            </p>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-3 text-[0.65rem] uppercase tracking-[0.25em] text-white/40">
+                            <span>Wins {diff.winsBefore} → {diff.winsAfter}</span>
+                            <span>Losses {diff.lossesBefore} → {diff.lossesAfter}</span>
+                            <span>
+                              Matches {diff.matchesBefore} → {diff.matchesAfter} ({formatDeltaInteger(diff.matchesDelta)})
+                            </span>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+
+                {recalcPreview.proposedLeaderboard.length > 0 && (
+                  <details className="rounded-2xl border border-white/10 bg-slate-900/40 p-3 text-xs text-white/70">
+                    <summary className="cursor-pointer text-sm font-semibold text-white">
+                      Preview top performers
+                    </summary>
+                    <ul className="mt-3 space-y-2">
+                      {recalcPreview.proposedLeaderboard.map((entry, index) => (
+                        <li key={entry.logoId} className="flex items-center justify-between">
+                          <span>
+                            #{index + 1} {entry.logoName}
+                          </span>
+                          <span className="text-white/60">{Math.round(entry.rating).toLocaleString()} pts</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+
+                {recalculationApplied && (
+                  <p className="text-xs uppercase tracking-[0.3em] text-emerald-300/70">
+                    Most recent run applied successfully.
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
       {(localNotice || notice) && (
         <p
           className={`rounded-2xl border px-4 py-3 text-sm ${
@@ -874,4 +1066,24 @@ function ContestCard({ contest, isActive, busy, busyAction, notice, onUpdate, on
       )}
     </form>
   )
+}
+
+function formatRatingValue(value: number): string {
+  return Math.round(value).toLocaleString()
+}
+
+function formatDeltaValue(value: number): string {
+  const rounded = Math.round(value * 100) / 100
+  const formatted = rounded.toLocaleString(undefined, { maximumFractionDigits: 2 })
+  if (rounded === 0) {
+    return '±0'
+  }
+  return `${rounded > 0 ? '+' : ''}${formatted}`
+}
+
+function formatDeltaInteger(value: number): string {
+  if (value === 0) {
+    return '±0'
+  }
+  return `${value > 0 ? '+' : ''}${value}`
 }

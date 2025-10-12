@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 import { useElo } from '../state/EloContext'
 import { useAuth } from '../state/AuthContext'
 import { hashAliasForVoting } from '../lib/auth-utils'
 import { SignInPrompt } from '../components/AuthPrompts'
+import { calculateTotalMatches } from '../lib/elo-engine'
 
 export const Route = createFileRoute('/vote')({
   component: VotePage,
@@ -12,8 +13,10 @@ export const Route = createFileRoute('/vote')({
 
 function VotePage() {
   const { user, isAuthenticated, loading } = useAuth()
-  const { currentMatchup, selectWinner, skipMatchup, recentHistory } = useElo()
+  const { currentMatchup, selectWinner, skipMatchup, ratings } = useElo()
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const totalMatches = useMemo(() => calculateTotalMatches(ratings), [ratings])
 
   const handleVote = useCallback(
     async (winnerId: string, loserId: string) => {
@@ -156,7 +159,7 @@ function VotePage() {
           >
             Skip matchup
           </button>
-          <p>Votes recorded: {recentHistory.length}</p>
+          <p>Votes recorded: {totalMatches.toLocaleString()}</p>
           <Link
             to="/scores"
             className="inline-flex items-center gap-2 rounded-full border border-cyan-300/40 px-4 py-2 font-semibold text-cyan-200 transition hover:border-cyan-200 hover:text-cyan-100"

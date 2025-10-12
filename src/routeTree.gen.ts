@@ -32,6 +32,7 @@ import { Route as ApiLogosLogoIdRouteImport } from './routes/api.logos.$logoId'
 import { Route as ApiContestsContestIdRouteImport } from './routes/api.contests.$contestId'
 import { Route as ApiLogosLogoIdImageRouteImport } from './routes/api.logos.$logoId.image'
 import { Route as ApiContestsContestIdResetRouteImport } from './routes/api.contests.$contestId.reset'
+import { Route as ApiContestsContestIdRecalculateEloRouteImport } from './routes/api.contests.$contestId.recalculate-elo'
 
 const VoteRoute = VoteRouteImport.update({
   id: '/vote',
@@ -149,6 +150,12 @@ const ApiContestsContestIdResetRoute =
     path: '/reset',
     getParentRoute: () => ApiContestsContestIdRoute,
   } as any)
+const ApiContestsContestIdRecalculateEloRoute =
+  ApiContestsContestIdRecalculateEloRouteImport.update({
+    id: '/recalculate-elo',
+    path: '/recalculate-elo',
+    getParentRoute: () => ApiContestsContestIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/api/logos/$logoId': typeof ApiLogosLogoIdRouteWithChildren
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
+  '/api/contests/$contestId/recalculate-elo': typeof ApiContestsContestIdRecalculateEloRoute
   '/api/contests/$contestId/reset': typeof ApiContestsContestIdResetRoute
   '/api/logos/$logoId/image': typeof ApiLogosLogoIdImageRoute
 }
@@ -197,6 +205,7 @@ export interface FileRoutesByTo {
   '/api/logos/$logoId': typeof ApiLogosLogoIdRouteWithChildren
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
+  '/api/contests/$contestId/recalculate-elo': typeof ApiContestsContestIdRecalculateEloRoute
   '/api/contests/$contestId/reset': typeof ApiContestsContestIdResetRoute
   '/api/logos/$logoId/image': typeof ApiLogosLogoIdImageRoute
 }
@@ -223,6 +232,7 @@ export interface FileRoutesById {
   '/api/logos/$logoId': typeof ApiLogosLogoIdRouteWithChildren
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
+  '/api/contests/$contestId/recalculate-elo': typeof ApiContestsContestIdRecalculateEloRoute
   '/api/contests/$contestId/reset': typeof ApiContestsContestIdResetRoute
   '/api/logos/$logoId/image': typeof ApiLogosLogoIdImageRoute
 }
@@ -250,6 +260,7 @@ export interface FileRouteTypes {
     | '/api/logos/$logoId'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
+    | '/api/contests/$contestId/recalculate-elo'
     | '/api/contests/$contestId/reset'
     | '/api/logos/$logoId/image'
   fileRoutesByTo: FileRoutesByTo
@@ -275,6 +286,7 @@ export interface FileRouteTypes {
     | '/api/logos/$logoId'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
+    | '/api/contests/$contestId/recalculate-elo'
     | '/api/contests/$contestId/reset'
     | '/api/logos/$logoId/image'
   id:
@@ -300,6 +312,7 @@ export interface FileRouteTypes {
     | '/api/logos/$logoId'
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
+    | '/api/contests/$contestId/recalculate-elo'
     | '/api/contests/$contestId/reset'
     | '/api/logos/$logoId/image'
   fileRoutesById: FileRoutesById
@@ -488,6 +501,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiContestsContestIdResetRouteImport
       parentRoute: typeof ApiContestsContestIdRoute
     }
+    '/api/contests/$contestId/recalculate-elo': {
+      id: '/api/contests/$contestId/recalculate-elo'
+      path: '/recalculate-elo'
+      fullPath: '/api/contests/$contestId/recalculate-elo'
+      preLoaderRoute: typeof ApiContestsContestIdRecalculateEloRouteImport
+      parentRoute: typeof ApiContestsContestIdRoute
+    }
   }
 }
 
@@ -503,10 +523,13 @@ const GalleryRouteWithChildren =
   GalleryRoute._addFileChildren(GalleryRouteChildren)
 
 interface ApiContestsContestIdRouteChildren {
+  ApiContestsContestIdRecalculateEloRoute: typeof ApiContestsContestIdRecalculateEloRoute
   ApiContestsContestIdResetRoute: typeof ApiContestsContestIdResetRoute
 }
 
 const ApiContestsContestIdRouteChildren: ApiContestsContestIdRouteChildren = {
+  ApiContestsContestIdRecalculateEloRoute:
+    ApiContestsContestIdRecalculateEloRoute,
   ApiContestsContestIdResetRoute: ApiContestsContestIdResetRoute,
 }
 

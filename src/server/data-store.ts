@@ -19,11 +19,16 @@ import {
   ensureEntries,
   parseEloState,
   createEmptyEntry,
+  calculateTotalMatches,
   type EloState,
 } from '../lib/elo-engine'
 import { DEFAULT_CONTEST_ID } from '../lib/contest-utils'
 import { ensureContest, getActiveContestId } from './contest-store'
-import { logVoteRecorded, logVotesReset } from './audit-log'
+import {
+  logVoteRecorded,
+  logVotesReset,
+  type VoteAuditEvent,
+} from './audit-log'
 import { restoreLatestBackup, writeJsonWithBackup } from './persistence-utils'
 import { ensureDataDir, resolveDataPath } from './storage-utils'
 
@@ -32,6 +37,7 @@ const VOTES_FILE = 'votes.json'
 const LOGO_SCHEMA_VERSION = 3
 const VOTE_SCHEMA_VERSION = 2
 const LOGO_ASSETS_DIR = 'logos'
+const VOTE_EVENT_LOG_FILE = 'vote-events.ndjson'
 
 interface LogosFileSchema {
   version: number
@@ -429,6 +435,66 @@ async function writeVotesFile(schema: VotesFileSchema, options: { forceBackup?: 
     minIntervalMs: 15_000,
     maxRetained: 200,
     forceBackup: options.forceBackup ?? false,
+  })
+}
+
+async function readVoteAuditEvents(): Promise<VoteAuditEvent[]> {
+  await ensureDataDir()
+  const filePath = resolveDataPath(VOTE_EVENT_LOG_FILE)
+
+  try {
+    const raw = await fs.readFile(filePath, 'utf-8')
+    const lines = raw.split('\n')
+    const events: VoteAuditEvent[] = []
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed) {
+        continue
+      }
+      try {
+        const parsed = JSON.parse(trimmed) as VoteAuditEvent
+        if (parsed && (parsed.type === 'vote-recorded' || parsed.type === 'votes-reset')) {
+          events.push(parsed)
+        }
+      } catch (error) {
+        console.warn('Skipping malformed vote audit entry', error)
+      }
+    }
+
+    return events
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error) {
+      const code = (error as { code?: string }).code
+      if (code === 'ENOENT') {
+        return []
+      }
+    }
+    console.warn('Failed to read vote audit log; continuing without history replay.', error)
+    return []
+  }
+}
+
+function sortVoteAuditEvents(events: VoteAuditEvent[]): VoteAuditEvent[] {
+  return [...events].sort((a, b) => {
+    const timeA = Number.isFinite(Date.parse(a.occurredAt)) ? Date.parse(a.occurredAt) : 0
+    const timeB = Number.isFinite(Date.parse(b.occurredAt)) ? Date.parse(b.occurredAt) : 0
+
+    if (timeA !== timeB) {
+      return timeA - timeB
+    }
+
+    if (a.type === 'vote-recorded' && b.type === 'vote-recorded') {
+      return a.matchTimestamp - b.matchTimestamp
+    }
+
+    if (a.type === 'vote-recorded') {
+      return 1
+    }
+    if (b.type === 'vote-recorded') {
+      return -1
+    }
+    return 0
   })
 }
 
@@ -900,7 +966,7 @@ export async function resetContestVotes(contestId?: string): Promise<EloState> {
 
   const votesFile = await readVotesFile()
   const previousState = votesFile.contests[resolvedContestId]?.state ?? { entries: {}, history: [] }
-  const previousMatchCount = previousState.history.length
+  const previousMatchCount = calculateTotalMatches(previousState.entries)
 
   const nextSchema: VotesFileSchema = {
     version: VOTE_SCHEMA_VERSION,
@@ -930,6 +996,39 @@ export async function resetContestVotes(contestId?: string): Promise<EloState> {
   return blankState
 }
 
+function buildLeaderboard(logos: LogoEntry[], state: EloState) {
+  const logoIndex = new Map(logos.map((logo) => [logo.id, logo]))
+
+  return Object.entries(state.entries)
+    .map(([logoId, entry]) => {
+      const logo = logoIndex.get(logoId)
+      if (!logo) {
+        return null
+      }
+      return {
+        logoId,
+        logoName: logo.name,
+        logoCodename: logo.codename,
+        logoImage: logo.image,
+        rating: entry.rating,
+        wins: entry.wins,
+        losses: entry.losses,
+        matches: entry.matches,
+      }
+    })
+    .filter((value): value is NonNullable<typeof value> => Boolean(value))
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 5)
+}
+
+function getLastMatchTimestamp(state: EloState): string | null {
+  if (state.history.length === 0) {
+    return null
+  }
+  const lastEntry = state.history[state.history.length - 1]
+  return lastEntry ? new Date(lastEntry.timestamp).toISOString() : null
+}
+
 export async function getContestMetrics(
   contestId: string,
 ): Promise<{
@@ -950,7 +1049,7 @@ export async function getContestMetrics(
   const resolvedContestId = await resolveContestId(contestId)
   const { logos } = await getContestLogosInternal(resolvedContestId)
   const votesFile = await readVotesFile()
-  const { schema: ensuredVotes, state, changed } = ensureContestVotes(
+    const { schema: ensuredVotes, state, changed } = ensureContestVotes(
     votesFile,
     resolvedContestId,
     logos,
@@ -960,37 +1059,166 @@ export async function getContestMetrics(
     await writeVotesFile(ensuredVotes)
   }
 
-  const logoIndex = new Map(logos.map((logo) => [logo.id, logo]))
-
-  const leaderboard = Object.entries(state.entries)
-    .map(([logoId, entry]) => {
-      const logo = logoIndex.get(logoId)
-      if (!logo) {
-        return null
-      }
-      return {
-        logoId,
-        logoName: logo.name,
-        logoCodename: logo.codename,
-        logoImage: logo.image,
-        rating: entry.rating,
-        wins: entry.wins,
-        losses: entry.losses,
-        matches: entry.matches,
-      }
-    })
-    .filter((value): value is NonNullable<typeof value> => Boolean(value))
-    .sort((a, b) => b.rating - a.rating)
-    .slice(0, 5)
-
-  const lastMatchAt = state.history.length > 0
-    ? new Date(state.history[state.history.length - 1]!.timestamp).toISOString()
-    : null
+  const leaderboard = buildLeaderboard(logos, state)
+  const lastMatchAt = getLastMatchTimestamp(state)
 
   return {
     logoCount: logos.length,
-    matchCount: state.history.length,
+    matchCount: calculateTotalMatches(state.entries),
     leaderboard,
     lastMatchAt,
+  }
+}
+
+export interface EloRecalculationDifference {
+  logoId: string
+  logoName: string
+  logoCodename: string
+  ratingBefore: number
+  ratingAfter: number
+  ratingDelta: number
+  winsBefore: number
+  winsAfter: number
+  lossesBefore: number
+  lossesAfter: number
+  matchesBefore: number
+  matchesAfter: number
+  matchesDelta: number
+}
+
+export interface EloRecalculationResult {
+  dryRun: boolean
+  totalMatches: number
+  changesDetected: boolean
+  differences: EloRecalculationDifference[]
+  proposedState: EloState
+  currentState: EloState
+  proposedLeaderboard: ReturnType<typeof buildLeaderboard>
+  lastMatchAt: string | null
+}
+
+export async function recalculateContestElo(
+  contestId: string,
+  options: { dryRun?: boolean } = {},
+): Promise<EloRecalculationResult> {
+  const dryRun = options.dryRun ?? false
+  const resolvedContestId = await resolveContestId(contestId)
+
+  const [{ logos: activeLogos }, { logos: allLogos }] = await Promise.all([
+    getContestLogosInternal(resolvedContestId),
+    getContestLogosInternal(resolvedContestId, { includeRemoved: true }),
+  ])
+
+  const votesFile = await readVotesFile()
+  const ensured = ensureContestVotes(votesFile, resolvedContestId, activeLogos)
+  if (ensured.changed) {
+    await writeVotesFile(ensured.schema)
+  }
+
+  const currentState = ensured.state
+  const baseVotesSchema = ensured.changed ? ensured.schema : votesFile
+
+  const events = await readVoteAuditEvents()
+  const contestEvents = sortVoteAuditEvents(
+    events.filter((event) => event.contestId === resolvedContestId),
+  )
+
+  let replayState = ensureEntries({ entries: {}, history: [] }, allLogos)
+
+  for (const event of contestEvents) {
+    if (event.type === 'votes-reset') {
+      replayState = ensureEntries({ entries: {}, history: [] }, allLogos)
+      continue
+    }
+
+    const winnerId = event.winner?.id
+    const loserId = event.loser?.id
+
+    if (!winnerId || !loserId) {
+      continue
+    }
+
+    replayState = applyMatch(replayState, winnerId, loserId, event.voterHash ?? null, {
+      timestamp: Number.isFinite(event.matchTimestamp) ? event.matchTimestamp : undefined,
+    })
+  }
+
+  replayState = pruneEntries(replayState, activeLogos)
+  replayState = ensureEntries(replayState, activeLogos)
+
+  const logoLookup = new Map(activeLogos.map((logo) => [logo.id, logo]))
+  const comparedIds = new Set([
+    ...Object.keys(currentState.entries),
+    ...Object.keys(replayState.entries),
+  ])
+
+  const differences: EloRecalculationDifference[] = []
+
+  for (const logoId of comparedIds) {
+    const before = currentState.entries[logoId] ?? createEmptyEntry()
+    const after = replayState.entries[logoId] ?? createEmptyEntry()
+
+    const ratingChanged = before.rating !== after.rating
+    const winsChanged = before.wins !== after.wins
+    const lossesChanged = before.losses !== after.losses
+    const matchesChanged = before.matches !== after.matches
+
+    if (!ratingChanged && !winsChanged && !lossesChanged && !matchesChanged) {
+      continue
+    }
+
+    const logo = logoLookup.get(logoId)
+
+    differences.push({
+      logoId,
+      logoName: logo?.name ?? '(unknown logo)',
+      logoCodename: logo?.codename ?? logo?.name ?? logoId,
+      ratingBefore: before.rating,
+      ratingAfter: after.rating,
+      ratingDelta: after.rating - before.rating,
+      winsBefore: before.wins,
+      winsAfter: after.wins,
+      lossesBefore: before.losses,
+      lossesAfter: after.losses,
+      matchesBefore: before.matches,
+      matchesAfter: after.matches,
+      matchesDelta: after.matches - before.matches,
+    })
+  }
+
+  differences.sort((a, b) => {
+    const deltaDiff = Math.abs(b.ratingDelta) - Math.abs(a.ratingDelta)
+    if (deltaDiff !== 0) {
+      return deltaDiff
+    }
+    return a.logoName.localeCompare(b.logoName)
+  })
+
+  const changesDetected = differences.length > 0
+
+  if (!dryRun && changesDetected) {
+    const nextSchema: VotesFileSchema = {
+      version: VOTE_SCHEMA_VERSION,
+      contests: {
+        ...baseVotesSchema.contests,
+        [resolvedContestId]: {
+          state: replayState,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+      updatedAt: new Date().toISOString(),
+    }
+    await writeVotesFile(nextSchema, { forceBackup: true })
+  }
+
+  return {
+    dryRun,
+    totalMatches: calculateTotalMatches(replayState.entries),
+    changesDetected,
+    differences,
+    proposedState: replayState,
+    currentState,
+    proposedLeaderboard: buildLeaderboard(activeLogos, replayState),
+    lastMatchAt: getLastMatchTimestamp(replayState),
   }
 }

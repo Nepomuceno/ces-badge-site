@@ -108,7 +108,6 @@ describe('getContestMetrics', () => {
                   'logo-2': { rating: 1400, wins: 1, losses: 3, matches: 4 },
                 },
                 history: [
-                  { winnerId: 'logo-1', loserId: 'logo-2', timestamp: 1_700_000_000_000, voterHash: null },
                   { winnerId: 'logo-2', loserId: 'logo-1', timestamp: LAST_MATCH_TIMESTAMP, voterHash: null },
                 ],
               },
@@ -135,11 +134,11 @@ describe('getContestMetrics', () => {
     await rm(dataDir, { recursive: true, force: true })
   })
 
-  it('returns leaderboard data and last match timestamp', async () => {
+  it('returns leaderboard data with accurate totals', async () => {
     const metrics = await getContestMetrics('test-contest')
 
     expect(metrics.logoCount).toBe(2)
-    expect(metrics.matchCount).toBe(2)
+    expect(metrics.matchCount).toBe(4) // total matches derive from entry stats, not retained history size
     expect(metrics.lastMatchAt).toBe(new Date(LAST_MATCH_TIMESTAMP).toISOString())
 
     expect(metrics.leaderboard).toHaveLength(2)
