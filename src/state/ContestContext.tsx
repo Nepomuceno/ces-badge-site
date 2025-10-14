@@ -19,6 +19,7 @@ function normalizeContestSummary(contest: ContestSummary): ContestSummary {
     ...contest,
     leaderboard: Array.isArray(contest.leaderboard) ? contest.leaderboard : [],
     lastMatchAt: contest.lastMatchAt ?? null,
+    championInsights: contest.championInsights ?? null,
   }
 }
 
@@ -44,6 +45,8 @@ interface ContestContextValue {
   selectedContestId: string | null
   activeContest: ContestSummary | null
   selectedContest: ContestSummary | null
+  liveContest: ContestSummary | null
+  hasLiveContest: boolean
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
@@ -393,6 +396,9 @@ export function ContestProvider({ children }: { children: ReactNode }) {
     return { activeContest: active, selectedContest: selected }
   }, [activeContestId, contests, selectedContestId])
 
+  const liveContest = activeContest && activeContest.isActive && activeContest.votingOpen ? activeContest : null
+  const hasLiveContest = Boolean(liveContest)
+
   const value = useMemo<ContestContextValue>(
     () => ({
       contests: [...contests].sort((a, b) => a.title.localeCompare(b.title)),
@@ -400,6 +406,8 @@ export function ContestProvider({ children }: { children: ReactNode }) {
       selectedContestId,
       activeContest,
       selectedContest,
+      liveContest,
+      hasLiveContest,
       loading,
       error,
       refresh,
@@ -425,6 +433,8 @@ export function ContestProvider({ children }: { children: ReactNode }) {
       setActiveContest,
       updateContestMutation,
       resetContestVotesMutation,
+      liveContest,
+      hasLiveContest,
     ],
   )
 

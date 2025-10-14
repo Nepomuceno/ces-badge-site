@@ -20,8 +20,8 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
 function FavoritesWithIdentity({ children }: { children: React.ReactNode }) {
   const { user, isAllowed } = useAuth()
-  const { selectedContestId } = useContest()
-  const contestKey = selectedContestId ? `${selectedContestId}::` : ''
+  const { liveContest } = useContest()
+  const contestKey = liveContest ? `${liveContest.id}::` : ''
   const identityKey = `${contestKey}${isAllowed && user?.email ? user.email : 'anonymous'}`
   return (
     <FavoritesProvider identityKey={identityKey}>

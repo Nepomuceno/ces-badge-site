@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 
 import { useElo } from '../state/EloContext'
@@ -7,6 +7,7 @@ import { useAuth } from '../state/AuthContext'
 import { SignInPrompt } from '../components/AuthPrompts'
 import { hashAliasForVoting } from '../lib/auth-utils'
 import { calculateTotalMatches } from '../lib/elo-engine'
+import { useContest } from '../state/ContestContext'
 
 export const Route = createFileRoute('/scores')({
   component: ScoresPage,
@@ -16,6 +17,7 @@ function ScoresPage() {
   const { user, isAuthenticated, loading } = useAuth()
   const { rankings, recentHistory, ratings } = useElo()
   const { logos } = useLogoLibrary()
+  const { liveContest, activeContest } = useContest()
   const [myVoteHash, setMyVoteHash] = useState<string | null>(null)
 
   useEffect(() => {
@@ -56,6 +58,26 @@ function ScoresPage() {
   const logoLookup = useMemo(() => new Map(logos.map((logo) => [logo.id, logo])), [logos])
 
   const recent = useMemo(() => recentHistory.slice(0, 10), [recentHistory])
+
+  if (!liveContest) {
+    const fallbackTitle = activeContest?.title ?? 'recent contests'
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 rounded-3xl border border-white/10 bg-white/5 p-12 text-center backdrop-blur">
+        <h1 className="text-3xl font-semibold text-white">Standings are currently archived</h1>
+        <p className="text-white/70">
+          We&apos;ll publish live ELO rankings when the next contest opens. Until then, revisit {fallbackTitle} in the contest timeline.
+        </p>
+        <div className="flex justify-center pt-2">
+          <Link
+            to="/contests"
+            className="rounded-full border border-cyan-300/40 px-5 py-2 text-sm font-semibold text-cyan-200 transition hover:border-cyan-200 hover:text-cyan-100"
+          >
+            Browse contest recaps
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (

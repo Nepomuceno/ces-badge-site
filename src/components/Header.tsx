@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 
 import { useAuth } from '../state/AuthContext'
 import { SignInPrompt } from './AuthPrompts'
+import { useContest } from '../state/ContestContext'
 
 type NavPath =
   | '/'
@@ -16,10 +17,17 @@ type NavPath =
   | '/favorites'
   | '/admin/contests'
 
+interface NavItem {
+  label: string
+  to: NavPath
+  disabled?: boolean
+}
+
 export default function Header() {
   const routerState = useRouterState()
   const activePath = routerState.location.pathname
   const { isAuthenticated, isAllowed, user, isAdmin, loading, logout } = useAuth()
+  const { hasLiveContest } = useContest()
   const [showAuthPanel, setShowAuthPanel] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showMobileNav, setShowMobileNav] = useState(false)
@@ -69,8 +77,8 @@ export default function Header() {
     }
   }, [showMobileNav])
 
-  const navItems = useMemo<Array<{ label: string; to: NavPath }>>(() => {
-    const base: Array<{ label: string; to: NavPath }> = [
+  const navItems = useMemo<NavItem[]>(() => {
+    const base: NavItem[] = [
       { label: 'Home', to: '/' },
       { label: 'Contests', to: '/contests' },
       { label: 'Gallery', to: '/gallery' },
@@ -87,8 +95,15 @@ export default function Header() {
       base.push({ label: 'Admin', to: '/admin/contests' })
     }
 
+    if (!hasLiveContest) {
+      const gated: Set<NavPath> = new Set(['/vote', '/scores', '/gallery', '/favorites', '/my-logos'])
+      return base.map((item) =>
+        gated.has(item.to) ? { ...item, disabled: true } : item,
+      )
+    }
+
     return base
-  }, [isAdmin, isAllowed])
+  }, [hasLiveContest, isAdmin, isAllowed])
 
   let mobileNavPortal: React.ReactNode = null
   if (showMobileNav && typeof document !== 'undefined') {
@@ -130,6 +145,17 @@ export default function Header() {
             {navItems.map((item) => {
               const isActive =
                 item.to === '/' ? activePath === item.to : activePath.startsWith(item.to)
+              if (item.disabled) {
+                return (
+                  <span
+                    key={item.to}
+                    className="flex items-center justify-between rounded-2xl border border-white/5 px-4 py-3 text-white/30"
+                    title="Available when a contest is live"
+                  >
+                    {item.label}
+                  </span>
+                )
+              }
               return (
                 <Link
                   key={item.to}
@@ -210,6 +236,17 @@ export default function Header() {
             {navItems.map((item) => {
               const isActive =
                 item.to === '/' ? activePath === item.to : activePath.startsWith(item.to)
+              if (item.disabled) {
+                return (
+                  <span
+                    key={item.to}
+                    className="rounded-full px-4 py-2 text-white/30"
+                    title="Available when a contest is live"
+                  >
+                    {item.label}
+                  </span>
+                )
+              }
               return (
                 <Link
                   key={item.to}

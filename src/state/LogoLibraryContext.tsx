@@ -58,8 +58,8 @@ async function readLogosFromServer(contestId: string, signal?: AbortSignal): Pro
 }
 
 export function LogoLibraryProvider({ children }: { children: ReactNode }) {
-  const { selectedContestId, selectedContest } = useContest()
-  const contestId = selectedContestId ?? selectedContest?.id ?? null
+  const { liveContest } = useContest()
+  const contestId = liveContest?.id ?? null
 
   const [allLogos, setAllLogos] = useState<LogoEntry[]>(seedLogos)
   const [loading, setLoading] = useState(false)

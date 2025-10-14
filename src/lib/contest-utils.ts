@@ -26,11 +26,31 @@ export interface ContestLeaderboardEntry {
   matches: number
 }
 
+export interface ChampionWinStreak {
+  count: number
+  startedAt: string | null
+  endedAt: string | null
+}
+
+export interface ChampionOpponentFact {
+  logoId: string
+  logoName: string
+  wins: number
+  losses: number
+}
+
+export interface ChampionInsights {
+  longestWinStreak: ChampionWinStreak | null
+  undefeatedOpponents: ChampionOpponentFact[]
+  nemesis: ChampionOpponentFact | null
+}
+
 export interface ContestWithMetrics extends Contest {
   logoCount: number
   matchCount: number
   leaderboard: ContestLeaderboardEntry[]
   lastMatchAt: string | null
+  championInsights?: ChampionInsights | null
 }
 
 export const DEFAULT_CONTEST_ID = 'badge-arena'

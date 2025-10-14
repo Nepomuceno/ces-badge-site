@@ -21,6 +21,7 @@ import { Route as AccessDeniedRouteImport } from './routes/access-denied'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LogosLogoIdRouteImport } from './routes/logos.$logoId'
 import { Route as GalleryLogoIdRouteImport } from './routes/gallery.$logoId'
+import { Route as Contest_resultsContestIdRouteImport } from './routes/contest_results.$contestId'
 import { Route as ApiVotesRouteImport } from './routes/api.votes'
 import { Route as ApiLogosRouteImport } from './routes/api.logos'
 import { Route as ApiContestsRouteImport } from './routes/api.contests'
@@ -94,6 +95,12 @@ const GalleryLogoIdRoute = GalleryLogoIdRouteImport.update({
   path: '/$logoId',
   getParentRoute: () => GalleryRoute,
 } as any)
+const Contest_resultsContestIdRoute =
+  Contest_resultsContestIdRouteImport.update({
+    id: '/contest_results/$contestId',
+    path: '/contest_results/$contestId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiVotesRoute = ApiVotesRouteImport.update({
   id: '/api/votes',
   path: '/api/votes',
@@ -173,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/api/contests': typeof ApiContestsRouteWithChildren
   '/api/logos': typeof ApiLogosRouteWithChildren
   '/api/votes': typeof ApiVotesRoute
+  '/contest_results/$contestId': typeof Contest_resultsContestIdRoute
   '/gallery/$logoId': typeof GalleryLogoIdRoute
   '/logos/$logoId': typeof LogosLogoIdRoute
   '/api/contests/$contestId': typeof ApiContestsContestIdRouteWithChildren
@@ -199,6 +207,7 @@ export interface FileRoutesByTo {
   '/api/contests': typeof ApiContestsRouteWithChildren
   '/api/logos': typeof ApiLogosRouteWithChildren
   '/api/votes': typeof ApiVotesRoute
+  '/contest_results/$contestId': typeof Contest_resultsContestIdRoute
   '/gallery/$logoId': typeof GalleryLogoIdRoute
   '/logos/$logoId': typeof LogosLogoIdRoute
   '/api/contests/$contestId': typeof ApiContestsContestIdRouteWithChildren
@@ -226,6 +235,7 @@ export interface FileRoutesById {
   '/api/contests': typeof ApiContestsRouteWithChildren
   '/api/logos': typeof ApiLogosRouteWithChildren
   '/api/votes': typeof ApiVotesRoute
+  '/contest_results/$contestId': typeof Contest_resultsContestIdRoute
   '/gallery/$logoId': typeof GalleryLogoIdRoute
   '/logos/$logoId': typeof LogosLogoIdRoute
   '/api/contests/$contestId': typeof ApiContestsContestIdRouteWithChildren
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/api/contests'
     | '/api/logos'
     | '/api/votes'
+    | '/contest_results/$contestId'
     | '/gallery/$logoId'
     | '/logos/$logoId'
     | '/api/contests/$contestId'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/api/contests'
     | '/api/logos'
     | '/api/votes'
+    | '/contest_results/$contestId'
     | '/gallery/$logoId'
     | '/logos/$logoId'
     | '/api/contests/$contestId'
@@ -306,6 +318,7 @@ export interface FileRouteTypes {
     | '/api/contests'
     | '/api/logos'
     | '/api/votes'
+    | '/contest_results/$contestId'
     | '/gallery/$logoId'
     | '/logos/$logoId'
     | '/api/contests/$contestId'
@@ -333,6 +346,7 @@ export interface RootRouteChildren {
   ApiContestsRoute: typeof ApiContestsRouteWithChildren
   ApiLogosRoute: typeof ApiLogosRouteWithChildren
   ApiVotesRoute: typeof ApiVotesRoute
+  Contest_resultsContestIdRoute: typeof Contest_resultsContestIdRoute
   LogosLogoIdRoute: typeof LogosLogoIdRoute
   DemoStartApiRequestRoute: typeof DemoStartApiRequestRoute
   DemoStartServerFuncsRoute: typeof DemoStartServerFuncsRoute
@@ -423,6 +437,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/gallery/$logoId'
       preLoaderRoute: typeof GalleryLogoIdRouteImport
       parentRoute: typeof GalleryRoute
+    }
+    '/contest_results/$contestId': {
+      id: '/contest_results/$contestId'
+      path: '/contest_results/$contestId'
+      fullPath: '/contest_results/$contestId'
+      preLoaderRoute: typeof Contest_resultsContestIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/votes': {
       id: '/api/votes'
@@ -588,6 +609,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiContestsRoute: ApiContestsRouteWithChildren,
   ApiLogosRoute: ApiLogosRouteWithChildren,
   ApiVotesRoute: ApiVotesRoute,
+  Contest_resultsContestIdRoute: Contest_resultsContestIdRoute,
   LogosLogoIdRoute: LogosLogoIdRoute,
   DemoStartApiRequestRoute: DemoStartApiRequestRoute,
   DemoStartServerFuncsRoute: DemoStartServerFuncsRoute,

@@ -156,6 +156,7 @@ describe('getContestMetrics', () => {
       logoName: 'Bravo',
       rating: 1400,
     })
+    expect(metrics.championInsights).toBeNull()
   })
 
   it('resets votes to a clean state', async () => {
@@ -175,5 +176,6 @@ describe('getContestMetrics', () => {
         expect.objectContaining({ logoId: 'logo-2', rating: 1500, matches: 0 }),
       ]),
     )
+    expect(metrics.championInsights).toBeNull()
   })
 })

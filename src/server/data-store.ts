@@ -22,7 +22,7 @@ import {
   calculateTotalMatches,
   type EloState,
 } from '../lib/elo-engine'
-import { DEFAULT_CONTEST_ID } from '../lib/contest-utils'
+import { DEFAULT_CONTEST_ID, type ChampionInsights } from '../lib/contest-utils'
 import { ensureContest, getActiveContestId } from './contest-store'
 import {
   logVoteRecorded,
@@ -1018,7 +1018,129 @@ function buildLeaderboard(logos: LogoEntry[], state: EloState) {
     })
     .filter((value): value is NonNullable<typeof value> => Boolean(value))
     .sort((a, b) => b.rating - a.rating)
-    .slice(0, 5)
+}
+
+function computeChampionInsights(
+  logos: LogoEntry[],
+  state: EloState,
+  leaderboard: ReturnType<typeof buildLeaderboard>,
+): ChampionInsights | null {
+  const champion = leaderboard[0]
+  if (!champion) {
+    return null
+  }
+
+  if (!Array.isArray(state.history) || state.history.length === 0) {
+    return null
+  }
+
+  const logoIndex = new Map(logos.map((logo) => [logo.id, logo]))
+  const opponentStats = new Map<string, { wins: number; losses: number }>()
+
+  function ensureOpponentStats(opponentId: string) {
+    const existing = opponentStats.get(opponentId)
+    if (existing) {
+      return existing
+    }
+    const base = { wins: 0, losses: 0 }
+    opponentStats.set(opponentId, base)
+    return base
+  }
+
+  const chronologicalHistory = [...state.history].sort(
+    (a, b) => a.timestamp - b.timestamp,
+  )
+
+  let currentStreak = 0
+  let streakStart: number | null = null
+  let longestCount = 0
+  let longestStart: number | null = null
+  let longestEnd: number | null = null
+  let lastWinTimestamp: number | null = null
+
+  for (const match of chronologicalHistory) {
+    if (match.winnerId === champion.logoId) {
+      const record = ensureOpponentStats(match.loserId)
+      record.wins += 1
+
+      if (currentStreak === 0) {
+        streakStart = match.timestamp
+      }
+
+      currentStreak += 1
+      lastWinTimestamp = match.timestamp
+
+      if (currentStreak > longestCount) {
+        longestCount = currentStreak
+        longestStart = streakStart
+        longestEnd = match.timestamp
+      }
+      continue
+    }
+
+    if (match.loserId === champion.logoId) {
+      const record = ensureOpponentStats(match.winnerId)
+      record.losses += 1
+      currentStreak = 0
+      streakStart = null
+    }
+  }
+
+  // Capture trailing streak if the champion ends on a win.
+  if (currentStreak > longestCount) {
+    longestCount = currentStreak
+    longestStart = streakStart
+    longestEnd = lastWinTimestamp ?? longestEnd
+  }
+
+  const undefeatedOpponents = Array.from(opponentStats.entries())
+    .filter(([, record]) => record.losses === 0 && record.wins > 0)
+    .map(([logoId, record]) => ({
+      logoId,
+      logoName: logoIndex.get(logoId)?.name ?? logoId,
+      wins: record.wins,
+      losses: record.losses,
+    }))
+    .sort((a, b) => b.wins - a.wins)
+    .slice(0, 3)
+
+  const nemesisEntry = Array.from(opponentStats.entries())
+    .filter(([, record]) => record.losses > 0)
+    .sort((a, b) => {
+      const lossDelta = b[1].losses - a[1].losses
+      if (lossDelta !== 0) {
+        return lossDelta
+      }
+      return b[1].wins - a[1].wins
+    })
+    [0]
+
+  const nemesis = nemesisEntry
+    ? {
+        logoId: nemesisEntry[0],
+        logoName: logoIndex.get(nemesisEntry[0])?.name ?? nemesisEntry[0],
+        wins: nemesisEntry[1].wins,
+        losses: nemesisEntry[1].losses,
+      }
+    : null
+
+  const longestWinStreak = longestCount > 0
+    ? {
+        count: longestCount,
+        startedAt: longestStart ? new Date(longestStart).toISOString() : null,
+        endedAt: longestEnd ? new Date(longestEnd).toISOString() : null,
+      }
+    : null
+
+  if (!longestWinStreak && undefeatedOpponents.length === 0 && !nemesis) {
+    return null
+  }
+
+  return {
+    longestWinStreak,
+    undefeatedOpponents,
+    nemesis,
+  }
 }
 
 function getLastMatchTimestamp(state: EloState): string | null {
@@ -1045,6 +1167,7 @@ export async function getContestMetrics(
     matches: number
   }>
   lastMatchAt: string | null
+  championInsights: ChampionInsights | null
 }> {
   const resolvedContestId = await resolveContestId(contestId)
   const { logos } = await getContestLogosInternal(resolvedContestId)
@@ -1060,6 +1183,7 @@ export async function getContestMetrics(
   }
 
   const leaderboard = buildLeaderboard(logos, state)
+  const championInsights = computeChampionInsights(logos, state, leaderboard)
   const lastMatchAt = getLastMatchTimestamp(state)
 
   return {
@@ -1067,6 +1191,7 @@ export async function getContestMetrics(
     matchCount: calculateTotalMatches(state.entries),
     leaderboard,
     lastMatchAt,
+    championInsights,
   }
 }
 

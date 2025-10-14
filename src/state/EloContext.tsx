@@ -38,8 +38,8 @@ function buildLogosKey(logos: LogoEntry[]): string {
 
 export function EloProvider({ children }: { children: React.ReactNode }) {
   const { logos } = useLogoLibrary()
-  const { selectedContestId, selectedContest } = useContest()
-  const contestId = selectedContestId ?? selectedContest?.id ?? null
+  const { liveContest } = useContest()
+  const contestId = liveContest?.id ?? null
   const [state, setState] = useState<EloState>(EMPTY_STATE)
   const [currentMatchup, setCurrentMatchup] = useState<Matchup | null>(null)
 

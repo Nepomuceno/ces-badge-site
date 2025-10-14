@@ -6,6 +6,7 @@ import { useAuth } from '../state/AuthContext'
 import { hashAliasForVoting } from '../lib/auth-utils'
 import { SignInPrompt } from '../components/AuthPrompts'
 import { calculateTotalMatches } from '../lib/elo-engine'
+import { useContest } from '../state/ContestContext'
 
 export const Route = createFileRoute('/vote')({
   component: VotePage,
@@ -14,6 +15,7 @@ export const Route = createFileRoute('/vote')({
 function VotePage() {
   const { user, isAuthenticated, loading } = useAuth()
   const { currentMatchup, selectWinner, skipMatchup, ratings } = useElo()
+  const { liveContest, activeContest } = useContest()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const totalMatches = useMemo(() => calculateTotalMatches(ratings), [ratings])
@@ -40,6 +42,26 @@ function VotePage() {
     },
     [currentMatchup, selectWinner, user],
   )
+
+  if (!liveContest) {
+    const fallbackTitle = activeContest?.title ?? 'the next CES3 contest'
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 rounded-3xl border border-white/10 bg-white/5 p-12 text-center backdrop-blur">
+        <h1 className="text-3xl font-semibold text-white">Voting is currently closed</h1>
+        <p className="text-white/70">
+          We&apos;ll reopen the arena when {fallbackTitle} goes live. In the meantime, explore past champions and upcoming matchups.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3 pt-2">
+          <Link
+            to="/contests"
+            className="rounded-full border border-cyan-300/40 px-5 py-2 text-sm font-semibold text-cyan-200 transition hover:border-cyan-200 hover:text-cyan-100"
+          >
+            View contest timeline
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   if (loading) {
     return (

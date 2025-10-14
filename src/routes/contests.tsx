@@ -201,6 +201,8 @@ function ActiveContestCard({ contest }: { contest: ContestSummary }) {
   const lastTracked = contest.lastMatchAt
     ? new Date(contest.lastMatchAt).toLocaleString()
     : 'No matches yet'
+  const votingOpen = contest.votingOpen
+  const hasResults = contest.matchCount > 0
 
   return (
     <article className="rounded-3xl border border-cyan-300/40 bg-cyan-300/10 p-8 backdrop-blur">
@@ -210,8 +212,14 @@ function ActiveContestCard({ contest }: { contest: ContestSummary }) {
           <h3 className="mt-2 text-3xl font-semibold text-white">{contest.title}</h3>
           {contest.subtitle && <p className="mt-2 text-sm text-white/70">{contest.subtitle}</p>}
         </div>
-        <span className="rounded-full border border-emerald-300/60 bg-emerald-400/20 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-100">
-          Active now
+        <span
+          className={`rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] ${
+            votingOpen
+              ? 'border border-emerald-300/60 bg-emerald-400/20 text-emerald-100'
+              : 'border border-white/20 bg-white/10 text-white/60'
+          }`}
+        >
+          {votingOpen ? 'Active now' : 'Voting closed'}
         </span>
       </div>
       <p className="mt-6 text-sm text-white/70">{rangeLabel}</p>
@@ -221,18 +229,47 @@ function ActiveContestCard({ contest }: { contest: ContestSummary }) {
         <StatCell label="Last match" value={lastTracked} />
       </div>
       <div className="mt-8 flex flex-wrap items-center gap-3">
-        <Link
-          to="/vote"
-          className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-cyan-100"
-        >
-          Cast your vote
-        </Link>
-        <Link
-          to="/scores"
-          className="rounded-full border border-white/30 px-5 py-2 text-sm font-semibold text-white transition hover:border-cyan-200 hover:text-cyan-100"
-        >
-          View live scores
-        </Link>
+        {votingOpen ? (
+          <>
+            <Link
+              to="/vote"
+              className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-cyan-100"
+            >
+              Cast your vote
+            </Link>
+            <Link
+              to="/scores"
+              className="rounded-full border border-white/30 px-5 py-2 text-sm font-semibold text-white transition hover:border-cyan-200 hover:text-cyan-100"
+            >
+              View live scores
+            </Link>
+          </>
+        ) : (
+          <>
+            {hasResults ? (
+              <Link
+                to="/contest_results/$contestId"
+                params={{ contestId: contest.id }}
+                className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-cyan-100"
+              >
+                See contest results
+              </Link>
+            ) : (
+              <Link
+                to="/contests"
+                className="rounded-full border border-white/30 px-5 py-2 text-sm font-semibold text-white transition hover:border-cyan-200 hover:text-cyan-100"
+              >
+                Contest timeline
+              </Link>
+            )}
+            <Link
+              to="/scores"
+              className="rounded-full border border-white/30 px-5 py-2 text-sm font-semibold text-white transition hover:border-cyan-200 hover:text-cyan-100"
+            >
+              View standings
+            </Link>
+          </>
+        )}
       </div>
     </article>
   )
@@ -298,6 +335,22 @@ function ArchivedContestCard({ contest }: { contest: ContestSummary }) {
               </li>
             ))}
           </ul>
+        )}
+      </div>
+      <div>
+        {contest.matchCount > 0 ? (
+          <Link
+            to="/contest_results/$contestId"
+            params={{ contestId: contest.id }}
+            className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-white/70 transition hover:border-cyan-200 hover:text-cyan-100"
+          >
+            View recap
+            <span aria-hidden>→</span>
+          </Link>
+        ) : (
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-white/40">
+            Recap coming soon
+          </span>
         )}
       </div>
     </article>
