@@ -8,7 +8,7 @@ import {
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 
-import appCss from '../styles.css?url'
+import '../styles.css'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -25,10 +25,6 @@ export const Route = createRootRoute({
       },
     ],
     links: [
-      {
-        rel: 'stylesheet',
-        href: appCss,
-      },
       {
         rel: 'icon',
         type: 'image/x-icon',
