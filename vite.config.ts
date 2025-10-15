@@ -14,6 +14,10 @@ const config = defineConfig({
     tanstackStart(),
     viteReact(),
   ],
+  build: {
+    // Ensure CSS assets are properly referenced
+    assetsInlineLimit: 0,
+  },
 })
 
 export default config
