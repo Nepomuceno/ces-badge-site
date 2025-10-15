@@ -7,6 +7,8 @@ node_modules
 dist
 dist-ssr
 .output
+.tanstack
+.bun-cache
 server/runtime-data
 
 # Environment & tooling

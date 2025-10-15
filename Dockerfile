@@ -11,7 +11,8 @@ RUN bun install --frozen-lockfile
 COPY . ./
 
 # Build the production bundle
-RUN bun run build
+# Clear any existing build artifacts and caches to ensure a clean build
+RUN rm -rf dist .output .tanstack node_modules/.vite && bun run build
 
 # Re-install only production dependencies for the runtime image
 RUN rm -rf node_modules && bun install --frozen-lockfile --production
