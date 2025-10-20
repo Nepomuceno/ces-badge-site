@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM oven/bun:1 AS builder
+FROM --platform=linux/amd64 oven/bun:1 AS builder
 WORKDIR /app
 
 # Install dependencies first for better layer caching
@@ -12,7 +12,7 @@ COPY . ./
 
 # Build the production bundle
 # Clear any existing build artifacts and caches to ensure a clean build
-RUN rm -rf dist .output .tanstack node_modules/.vite && bun run build
+RUN rm -rf dist .output .tanstack node_modules/.vite && NODE_ENV=production bun run build
 
 # Re-install only production dependencies for the runtime image
 RUN rm -rf node_modules && bun install --frozen-lockfile --production

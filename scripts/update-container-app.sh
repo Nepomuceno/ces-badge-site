@@ -38,6 +38,23 @@ require_cli docker
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" && pwd)
 ROOT_DIR=$(cd -- "${SCRIPT_DIR}/.." && pwd)
 
+# Build locally first to ensure we have the correct CSS
+log "Building locally with bun..."
+cd "${ROOT_DIR}"
+rm -rf dist .output .tanstack node_modules/.vite
+bun run build >/dev/null 2>&1 || {
+  log_error "Local build failed. Cannot proceed with deployment."
+  exit 1
+}
+
+# Temporarily allow dist in Docker build context
+DOCKERIGNORE_BACKUP=""
+if grep -q "^dist$" .dockerignore 2>/dev/null; then
+  DOCKERIGNORE_BACKUP=$(cat .dockerignore)
+  sed -i.bak '/^dist$/d' .dockerignore
+  trap "echo '${DOCKERIGNORE_BACKUP}' > .dockerignore; rm -f .dockerignore.bak" EXIT
+fi
+
 SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID:-${SUBSCRIPTION_ID:-}}
 if [[ -z "${SUBSCRIPTION_ID}" ]]; then
   SUBSCRIPTION_ID=$(az account show --query id -o tsv 2>/dev/null || true)
@@ -53,7 +70,7 @@ az account set --subscription "${SUBSCRIPTION_ID}" >/dev/null
 log "Using subscription ${SUBSCRIPTION_NAME} (${SUBSCRIPTION_ID})."
 
 log "Building container image ${FULL_IMAGE}..."
-docker build --platform linux/amd64 -t "${FULL_IMAGE}" "${ROOT_DIR}" >/dev/null
+docker build --platform linux/amd64 -f "${ROOT_DIR}/Dockerfile.prebuilt" -t "${FULL_IMAGE}" "${ROOT_DIR}" >/dev/null
 
 log "Authenticating with ACR ${ACR_NAME}..."
 az acr login --name "${ACR_NAME}" >/dev/null
